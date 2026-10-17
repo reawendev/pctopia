@@ -10,6 +10,8 @@ import {
 import { isMissingTable, logEvent } from "./company";
 import { currentEvent } from "./events";
 import { postAbout } from "./social";
+import { payShares } from "./finance";
+import { SALES_MANAGER_BONUS } from "../game/finance";
 import { db, HttpError } from "./supabase";
 
 export type ModelRow = {
@@ -74,10 +76,12 @@ export async function loadMarket(force = false): Promise<MarketListing[]> {
   const companies = new Map<string, any>();
   const demand = new Map<string, number>();
   if (ids.length) {
-    const [{ data: cos }, { data: rels }] = await Promise.all([
+    const [{ data: cos }, { data: rels }, { data: managers }] = await Promise.all([
       db().from("companies").select("*").in("id", ids),
       db().from("relationships").select("*").in("company_id", ids),
+      db().from("employees").select("company_id").eq("role", "satis").in("company_id", ids),
     ]);
+    const hasManager = new Set((managers ?? []).map((m) => m.company_id));
     for (const c of cos ?? []) companies.set(c.id, c);
     const now = Date.now();
     for (const id of ids) {
@@ -90,7 +94,7 @@ export async function loadMarket(force = false): Promise<MarketListing[]> {
           married: r.married,
         }))
       );
-      demand.set(id, perks.demand);
+      demand.set(id, perks.demand + (hasManager.has(id) ? SALES_MANAGER_BONUS : 0));
     }
   }
   const mult = partMultipliers(currentEvent().effects);
@@ -168,6 +172,7 @@ export async function syncSales(ctx: Ctx, models?: ModelRow[] | null): Promise<b
 
     changed = true;
     await logEvent(ctx.id, "sales", `${sold} adet “${m.name}” satıldı, ${formatMoney(revenue)}.`, revenue);
+    await payShares(ctx.id, revenue, "PC satışı");
     const before = m.sold_total;
     const after = before + sold;
     const crossed = MILESTONES.filter((x) => before < x && after >= x).pop();

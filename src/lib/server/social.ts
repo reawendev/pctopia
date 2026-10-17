@@ -92,6 +92,26 @@ export const EVENTS = {
     rep: -2,
     texts: ["{company} sistemlerinin fidye yazılımı saldırısına uğradığı ortaya çıktı."],
   },
+  bank_default: {
+    author: "business",
+    rep: 0, // itibar cezası ayrıca uygulanır
+    texts: ["Kulis: {company} banka kredisini vadesinde ödeyemedi. Banka bir süre kredi vermeyecek.", "{company} için kötü haber: kredi temerrüde düştü."],
+  },
+  deal_default: {
+    author: "business",
+    rep: 0,
+    texts: ["{company}, {lender} şirketine olan borcunu ödeyemedi. Piyasada güven sarsıldı."],
+  },
+  deal_signed: {
+    author: "business",
+    rep: 1,
+    texts: ["{company} ve {partner} arasında yeni bir anlaşma imzalandı: {kind}.", "Piyasa Kulisi: {company} ile {partner} el sıkıştı ({kind})."],
+  },
+  luxury: {
+    author: "gossip",
+    rep: 0, // statü eşyasının kendi itibar etkisi ayrıca uygulanır
+    texts: ["{founder} ({company}) yeni {item} ile görüntülendi.", "Lüks hayat: {company} kurucusu {founder} bir {item} satın aldı."],
+  },
   tender_won: {
     author: "business",
     rep: 2,
@@ -117,7 +137,12 @@ export async function postAbout(
 ): Promise<void> {
   const def: EventDef = EVENTS[event];
   const text = fill(def.texts[Math.floor(Math.random() * def.texts.length)], vars);
-  const rep = def.rep > 0 ? def.rep + Math.round(pressBonus) : def.rep;
+  let rep = def.rep > 0 ? def.rep + Math.round(pressBonus) : def.rep;
+  if (rep < 0) {
+    // Halkla ilişkiler uzmanı olumsuz etkiyi yarıya indirir
+    const { data: pr } = await db().from("employees").select("role").eq("company_id", companyId).eq("role", "pr");
+    if (pr && pr.length > 0) rep = Math.trunc(rep / 2);
+  }
   const author = AUTHORS[def.author];
   const { error } = await db()
     .from("social_posts")

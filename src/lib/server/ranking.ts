@@ -29,7 +29,7 @@ export async function rankCompanies(): Promise<Ranked[]> {
   const prices = snapshot().prices;
   return (companies ?? [])
     .map((c) => {
-      const a = assets.get(c.id) ?? { owned: {}, holdings: {} };
+      const a = assets.get(c.id) ?? { owned: {}, holdings: {}, extra: 0 };
       return {
         id: c.id,
         ownerId: c.owner_id,
@@ -42,7 +42,7 @@ export async function rankCompanies(): Promise<Ranked[]> {
         character: c.character,
         createdAt: c.created_at,
         reputation: (c.reputation as number | undefined) ?? 50,
-        netWorth: companyNetWorth(c.cash, a.owned, a.holdings, prices),
+        netWorth: companyNetWorth(c.cash, a.owned, a.holdings, prices, (a as any).extra ?? 0),
       };
     })
     .sort((a, b) => b.netWorth - a.netWorth)

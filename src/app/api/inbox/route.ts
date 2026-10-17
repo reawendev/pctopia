@@ -1,6 +1,7 @@
 import { isMissingTable } from "@/lib/server/company";
 import { gameContext } from "@/lib/server/context";
 import { syncSales } from "@/lib/server/workshop";
+import { syncFinance } from "@/lib/server/finance";
 import { offerView, syncOffers, type OfferRow } from "@/lib/server/offers";
 import { db, handle, HttpError, requireUser } from "@/lib/server/supabase";
 
@@ -16,8 +17,9 @@ export const GET = handle(async (req) => {
 
   // Sayfa açıkken 30 sn'de bir çağrılır: PC satışlarını ve teklifleri birlikte günceller
   const salesChanged = await syncSales(g.ctx);
+  const financeChanged = await syncFinance(user.id);
   const { changed: offersChanged, ready } = await syncOffers(company, owned, g.netWorth, g.perks);
-  const changed = salesChanged || offersChanged;
+  const changed = salesChanged || offersChanged || financeChanged;
   if (!ready) {
     return { ready: false, offers: [], inbox: [], sent: [], unread: { offers: 0, messages: 0 }, changed };
   }
@@ -50,6 +52,12 @@ export const GET = handle(async (req) => {
   });
 
   const offerList = ((offers.data ?? []) as OfferRow[]).map(offerView);
+  const { count: pendingDeals } = await db()
+    .from("deals")
+    .select("id", { count: "exact", head: true })
+    .eq("to_company", company.id)
+    .eq("status", "pending")
+    .gt("expires_at", new Date().toISOString());
   const inboxList = ((inbox.data ?? []) as MsgRow[]).map(msgView);
 
   return {
@@ -58,6 +66,7 @@ export const GET = handle(async (req) => {
     offers: offerList,
     inbox: inboxList,
     sent: ((sent.data ?? []) as MsgRow[]).map(msgView),
+    pendingDeals: pendingDeals ?? 0,
     unread: {
       offers: offerList.filter((o) => !o.read && o.status !== "declined").length,
       messages: inboxList.filter((m) => !m.read).length,

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CompanyMark } from "./Portrait";
 import type { LogoSpec } from "@/lib/game/config";
@@ -34,6 +35,7 @@ export type InboxData = {
   inbox: Message[];
   sent: Message[];
   unread: { offers: number; messages: number };
+  pendingDeals?: number;
 };
 
 type Item = { kind: "offer"; at: number; offer: Offer } | { kind: "message"; at: number; msg: Message };
@@ -78,7 +80,9 @@ export function Mailbox({
   reload,
   onState,
   notify,
+  composeTo,
 }: {
+  composeTo?: string | null;
   data: InboxData | null;
   cash: number;
   now: number;
@@ -87,7 +91,10 @@ export function Mailbox({
   notify: (m: string) => void;
 }) {
   const [folder, setFolder] = useState<Folder>("gelen");
-  const [sel, setSel] = useState<Sel>(null);
+  const [sel, setSel] = useState<Sel>(composeTo ? { kind: "compose", to: composeTo } : null);
+  useEffect(() => {
+    if (composeTo) setSel({ kind: "compose", to: composeTo });
+  }, [composeTo]);
   const [busy, setBusy] = useState(false);
   const paneRef = useRef<HTMLDivElement>(null);
 
@@ -258,7 +265,10 @@ export function Mailbox({
               )}
               <div className="min-w-0">
                 <div className="truncate text-sm text-mute">
-                  {sel?.kind === "sent" ? `Kime: ${selectedMsg.to.name}` : `${selectedMsg.from.founderName}, ${selectedMsg.from.name}`}
+                  {sel?.kind === "sent" ? "Kime: " : `${selectedMsg.from.founderName}, `}
+                  <Link href={`/sirket/${(sel?.kind === "sent" ? selectedMsg.to : selectedMsg.from).id}`} className="hover:text-amber">
+                    {(sel?.kind === "sent" ? selectedMsg.to : selectedMsg.from).name}
+                  </Link>
                 </div>
                 <h2 className="heading text-xl">{selectedMsg.subject}</h2>
               </div>

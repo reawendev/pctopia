@@ -5,6 +5,7 @@ const PATHS: Record<string, string> = {
   uretim: "M7 7h10v10H7zM10 10h4v4h-4zM9 3v4M15 3v4M9 17v4M15 17v4M3 9h4M3 15h4M17 9h4M17 15h4",
   borsa: "M4 19h16M6 16l4-5 3 3 5-7M15 7h3v3",
   posta: "M3 6h18v12H3zM3 7l9 6 9-6",
+  finans: "M3 10l9-6 9 6M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18",
   hayat: "M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z",
   gundem: "M4 10v4h3l6 4V6L7 10zM16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11",
 };

@@ -136,6 +136,11 @@ export default function Admin() {
                     <td className="p-3">
                       <div className="flex justify-end gap-2">
                         {p.company && <button className="btn !px-2.5 !py-1.5 text-xs" onClick={() => grant(p)}>Nakit</button>}
+                        {p.company && (
+                          <button className="btn !px-2.5 !py-1.5 text-xs" onClick={() => run({ action: "removeImages", userId: p.userId }, `${p.company!.name} şirketinin yüklenen portre ve logosu kaldırılsın mı?`)}>
+                            Görselleri kaldır
+                          </button>
+                        )}
                         {!p.isAdmin && (
                           <button className="btn !px-2.5 !py-1.5 text-xs" onClick={() => run({ action: p.banned ? "unban" : "ban", userId: p.userId })}>
                             {p.banned ? "Aç" : "Askıya al"}

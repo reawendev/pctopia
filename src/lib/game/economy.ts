@@ -16,9 +16,9 @@ export function incomePerHour(owned: Owned): number {
 }
 
 /** Son toplamadan beri biriken gelir (çevrimdışı üst sınırıyla). */
-export function pendingIncome(owned: Owned, lastCollectedMs: number, nowMs: number): number {
+export function pendingIncome(owned: Owned, lastCollectedMs: number, nowMs: number, capHours = OFFLINE_CAP_HOURS): number {
   const hours = Math.max(0, (nowMs - lastCollectedMs) / 3_600_000);
-  return Math.floor(incomePerHour(owned) * Math.min(hours, OFFLINE_CAP_HOURS));
+  return Math.floor(incomePerHour(owned) * Math.min(hours, capHours));
 }
 
 /** Ekipmanın sıralamadaki değeri (satın alma maliyetlerinin bir oranı). */

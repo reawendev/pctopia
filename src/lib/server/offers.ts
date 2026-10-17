@@ -267,6 +267,7 @@ export async function syncOffers(
 
   let changed = false;
   let open = 0;
+  const secretary = ((company as any)._staff ?? []).includes("sekreter");
   for (const o of (live ?? []) as OfferRow[]) {
     if (o.status === "active" && o.resolves_at && new Date(o.resolves_at).getTime() <= now) {
       const choice = o.choices.find((c) => c.id === o.choice_id);
@@ -279,6 +280,16 @@ export async function syncOffers(
       } else {
         await db().rpc("settle_offer", { p_offer: o.id, p_status: "expired", p_amount: 0, p_text: "Yanıt verilmediği için teklifin süresi doldu." });
       }
+    } else if (o.status === "open" && secretary && new Date(o.expires_at).getTime() - now < SECRETARY_LEAD_MIN * 60_000) {
+      // Sekreter: süresi dolmak üzere olan teklifi senin yerine yanıtlar
+      const pick = secretaryChoice(o, Number((company as any).cash ?? 0), !!TEMPLATE_BY_ID[o.template]?.crisis);
+      try {
+        await respondOffer(company.id, company.name, o.id, pick.id, perks.press);
+      } catch {
+        await respondOffer(company.id, company.name, o.id, "decline", perks.press).catch(() => {});
+      }
+      await logEvent(company.id, "offer", `Sekreter, “${o.subject}” teklifini senin yerine yanıtladı: ${pick.label}.`);
+      changed = true;
     } else if (o.status === "open") {
       open++;
     }
@@ -331,6 +342,19 @@ export async function syncOffers(
   }
 
   return { changed, ready: true };
+}
+
+const SECRETARY_LEAD_MIN = 10;
+
+/** Sekreterin seçimi: beklenen değeri en yüksek seçenek; zararlıysa reddet (krizde en az zararlısı). */
+export function secretaryChoice(o: OfferRow, cash: number, crisis: boolean): Choice {
+  const options = o.choices.filter((c) => !c.decline && c.cost <= cash);
+  const ev = (c: Choice) => c.p * c.win + (1 - c.p) * c.lose - c.cost;
+  const best = options.sort((a, b) => ev(b) - ev(a))[0];
+  const decline = o.choices.find((c) => c.decline);
+  if (!best) return decline ?? o.choices[0];
+  if (!crisis && ev(best) <= 0 && decline) return decline;
+  return best;
 }
 
 /** Oyuncunun seçimini uygular. Anında sonuçlanan seçenekler hemen kapanır. */

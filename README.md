@@ -13,6 +13,8 @@
    - `supabase/migrations/004_teklifler_posta.sql`
    - `supabase/migrations/005_atolye_sosyal_hayat.sql`
    - `supabase/migrations/006_sezonlar.sql`
+   - `supabase/migrations/007_finans.sql`
+   - `supabase/migrations/008_sosyal_profil.sql`
 
    Mevcut bir veritabanını güncelliyorsan yalnızca henüz çalıştırmadığın `migrations/` dosyalarını çalıştır.
 2. `.env.example` dosyasını `.env.local` olarak kopyala, Supabase anahtarlarını gir.
@@ -69,7 +71,23 @@ Vercel'e bağla, ortam değişkenlerini ekle: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_
 
 - Yönetici panelinden "SEZONU BİTİR" yazarak bitirilir (önerilen bitiş: pazartesi 00:00). İlk üç şirket şeref listesine yazılır, `end_season` tüm şirketleri ve oyun verisini tek işlemde siler, yeni sezonu açar. Hesaplar ve yönetici yetkileri kalır.
 
+## Finans
+
+- `src/lib/game/finance.ts` kuralları, `src/lib/server/finance.ts` tembel hesaplamayı yapar (şirket ve posta isteklerinde çalışır).
+- **Çalışanlar:** muhasebeci (10 dakikada bir kendisi tahsilat yapar, birikme sınırı 24 saat), sekreter (süresi dolmak üzere olan teklifleri en iyi beklenen değerle yanıtlar), satış müdürü (PC talebi +%15), PR uzmanı (olumsuz itibar etkisini yarıya indirir). Maaş saatlik işler; kasa ödeyemezse çalışan istifa eder.
+- **Banka:** günlük %1 mevduat faizi, günlük %6 kredi faizi, 1–3 günlük vade. Kredi sınırı net değerin yarısı (en az $2.000). Vadesinde ödenmeyen kredi kasadan çekilir; kasa yetmezse itibar −10, 24 saat kredi yasağı ve haber.
+- **Mülkler:** ev, araba, saat, tekne, jet. İtibar ve partner yakınlığı verir; değerinin %70'i net değere sayılır ve o fiyata geri satılır.
+- **Oyuncular arası anlaşmalar:** toptan satış (alıcıya "(bayi)" modeli kopyalanır), borç (vade sonunda otomatik tahsil, ödenmezse itibar −10) ve gelir ortaklığı (PC satış gelirinin bir yüzdesi, toplamda en fazla %50). Teklifler 24 saat geçerli.
+
+## Profil ve görseller
+
+- `/sirket/[id]`: şirketin künyesi, net değer, itibar, sıra, satıştaki ürünleri, hakkındaki paylaşımlar, partneri, ekibi ve mülkleri. Buradan posta gönderilir ve anlaşma teklif edilir.
+- Oyuncular kuruluşta ya da Ofis'teki "Portre ve logo" kartından PNG, JPEG ya da WebP yükleyebilir (en fazla 1 MB, günde 10). Dosya türü uzantıdan değil içeriğin ilk baytlarından anlaşılır. Yüklemeler PixelLab hakkından düşmez.
+- Yönetici panelindeki "Görselleri kaldır" şirketi sade çizime döndürür.
+
 ## Sosyal medya ve itibar
+
+- Oyuncular da paylaşım yapabilir (saatte 10), beğenebilir ve yorum yazabilir (saatte 30). Herkes kendi paylaşımını ve yorumunu silebilir; kurgusal hesapların haberlerini yalnızca yönetici siler.
 
 - `src/lib/server/social.ts` — kurgusal hesaplar (@fiyatavcisi, @donanimcanavari, @teknogundem, @magazinekspres, @piyasakulisi). Fahiş/pahalı/uygun etiket, maliyet altı satış, darboğaz, satış eşikleri, tükenme, ilişki olayları, fidye saldırısı ve ihale kazanımı paylaşım üretir.
 - Her paylaşımın itibar etkisi vardır (−5 … +3). İtibar 0–100, başlangıç 50; satış hızını ve hak edilen fiyatı etkiler. Fiyat tepkisi model başına 30 dakikada en fazla bir kez gelir.
@@ -109,8 +127,9 @@ Next.js 14, yalnızca GET içeren route'lardaki `fetch` isteklerini kalıcı ola
 |---|---|
 | `/` | Giriş / kayıt |
 | `/kurulus` | Kurucu adı, şirket adı, logo ve karakter oluşturma |
-| `/oyun` | Genel (gelir toplama), Ekipman (8 kademe), Borsa (8 hisse, al-sat, haberler), Sıralama |
-| `/admin` | Oyuncu listesi, nakit ekle/düş, askıya al, şirket sil |
+| `/oyun` | Ofis, Üretim, Borsa, Finans, Posta, Hayat, Gündem |
+| `/sirket/[id]` | Şirket profili |
+| `/admin` | Oyuncu listesi, nakit ekle/düş, askıya al, görselleri kaldır, şirket sil, sezonu bitir |
 
 ## Yol haritası
 
@@ -120,9 +139,10 @@ Next.js 14, yalnızca GET içeren route'lardaki `fetch` isteklerini kalıcı ola
 - [x] Dakikalık borsa, 4 kat hızlı gelir, iş teklifleri ve senaryolar, şirketler arası posta
 - [x] Kompakt arayüz, PC Atölyesi, sosyal medya ve itibar, Hayat (ilişkiler)
 - [x] Ortak PC pazarı, dünya olayları, sezonlar ve şeref listesi
+- [x] Oyuncular arası anlaşmalar, çalışanlar, banka, mülkler
+- [x] Şirket profili, görsel yükleme, oyuncu paylaşımları
 - [x] Borsa: otomotiv, savunma, denizcilik, havacılık, enerji, yarı iletken, lojistik, telekom hisseleri
 - [ ] Şirket başarısına bağlı yatırımlar (süreli büyük projeler, ihaleler)
-- [ ] Piyasa olayları (kriz, talep patlaması)
-- [ ] Çalışanlar ve Ar-Ge
+- [ ] Ar-Ge
 - [ ] Mobil sürüm (Capacitor ile Android/iOS)
 - [ ] Oyuncular arası etkileşim (ihale, satın alma teklifi)

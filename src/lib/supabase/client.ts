@@ -35,3 +35,17 @@ export async function apiFetch<T = any>(path: string, init: RequestInit = {}): P
   }
   return json as T;
 }
+
+/** Dosya yükleme (multipart). Content-Type'ı tarayıcı belirler. */
+export async function apiUpload<T = any>(path: string, form: FormData): Promise<T> {
+  const { data } = await supabaseBrowser().auth.getSession();
+  const token = data.session?.access_token;
+  const res = await fetch(path, { method: "POST", body: form, headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err: any = new Error(json.error || "Yükleme başarısız");
+    err.status = res.status;
+    throw err;
+  }
+  return json as T;
+}

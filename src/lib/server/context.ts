@@ -5,6 +5,7 @@ import { stageFor } from "../game/stages";
 import { companyNetWorth, loadCompany, type CompanyRow } from "./company";
 import { companyPerks } from "./life";
 import { HttpError } from "./supabase";
+import { SALES_MANAGER_BONUS } from "../game/finance";
 import type { Owned } from "../game/economy";
 import type { Holdings } from "../game/market";
 
@@ -24,10 +25,12 @@ export async function gameContext(userId: string): Promise<GameContext> {
   const state = await loadCompany(userId);
   if (!state) throw new HttpError(404, "Önce şirket kurmalısın");
   const { company, owned, holdings } = state;
-  const netWorth = companyNetWorth(company.cash, owned, holdings);
+  const netWorth = companyNetWorth(company.cash, owned, holdings, undefined, company._extra ?? 0);
   const stageLevel = stageFor(netWorth).stage.level;
   const reputation = company.reputation ?? 50;
   const perks = await companyPerks(company.id);
+  // Satış müdürü: pazarda çekicilik +%15
+  if (company._staff?.includes("satis")) perks.demand += SALES_MANAGER_BONUS;
   return {
     company,
     owned,

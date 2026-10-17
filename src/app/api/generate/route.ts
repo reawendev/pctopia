@@ -20,6 +20,7 @@ async function usedToday(userId: string, kind: Kind): Promise<number> {
     .select("id", { count: "exact", head: true })
     .eq("user_id", userId)
     .eq("kind", kind)
+    .neq("prompt", "[yükleme]") // yüklemeler PixelLab hakkından düşülmez
     .gte("created_at", since);
   if (error) {
     if (isMissingTable(error)) throw new HttpError(503, "Görsel üretimi için veritabanında 003_gorseller_gunluk.sql çalıştırılmalı");
