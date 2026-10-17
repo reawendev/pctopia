@@ -6,7 +6,11 @@
 
 ## Kurulum
 
-1. Supabase'de yeni proje aç. **SQL Editor**'e `supabase/schema.sql` dosyasını yapıştırıp çalıştır.
+1. Supabase'de yeni proje aç. **SQL Editor**'de sırayla çalıştır:
+   - `supabase/schema.sql`
+   - `supabase/migrations/002_borsa.sql`
+
+   Mevcut bir veritabanını güncelliyorsan yalnızca henüz çalıştırmadığın `migrations/` dosyalarını çalıştır.
 2. `.env.example` dosyasını `.env.local` olarak kopyala, Supabase anahtarlarını gir.
 3. ```bash
    npm install
@@ -34,20 +38,29 @@ Vercel'e bağla, aynı üç ortam değişkenini (`NEXT_PUBLIC_SUPABASE_URL`, `NE
 - Satın alma, `apply_purchase` SQL fonksiyonuyla atomiktir; `version` alanı çifte harcamayı engeller.
 - Tablolarda RLS açık ve politika yok: istemci veritabanına doğrudan erişemez.
 
+### Borsa
+
+- `src/lib/game/market.ts` — hisseler, komisyon (%0,5), ortak hesaplar.
+- `src/lib/server/market.ts` — fiyat modeli (yalnızca sunucu). Fiyatlar veritabanına yazılmaz; gizli bir tohumdan 5 dakikalık tikler halinde deterministik hesaplanır. Böylece herkes aynı fiyatı görür, cron gerekmez, gelecek fiyatlar tahmin edilemez.
+- Model: ortalamaya dönen gürültü + günler/haftalar süren döngüler + hafif uzun vadeli büyüme + ara sıra haber şokları. Şoklar haber akışında başlık olarak görünür.
+- Tohum `MARKET_SEED` ortam değişkeninden okunur; yoksa service role anahtarından türetilir. **Tohumu değiştirmek tüm fiyat geçmişini değiştirir**, yayındayken dokunma.
+- Net değer = nakit + ekipman değeri (%50) + portföyün güncel piyasa değeri.
+
 ## Ekranlar
 
 | Yol | İçerik |
 |---|---|
 | `/` | Giriş / kayıt |
 | `/kurulus` | Kurucu adı, şirket adı, logo ve karakter oluşturma |
-| `/oyun` | Genel (gelir toplama), Ekipman (8 kademe), Sıralama |
+| `/oyun` | Genel (gelir toplama), Ekipman (8 kademe), Borsa (8 hisse, al-sat, haberler), Sıralama |
 | `/admin` | Oyuncu listesi, nakit ekle/düş, askıya al, şirket sil |
 
 ## Yol haritası
 
 - [x] Çekirdek döngü: şirket kur, ekipman al, gelir topla, sıralama
 - [x] Yönetici paneli
-- [ ] Yatırım sistemi: otomotiv, savunma sanayii, denizcilik vb. sektörler; şans + şirket başarısına bağlı getiri/kayıp
+- [x] Borsa: otomotiv, savunma, denizcilik, havacılık, enerji, yarı iletken, lojistik, telekom hisseleri
+- [ ] Şirket başarısına bağlı yatırımlar (süreli büyük projeler, ihaleler)
 - [ ] Piyasa olayları (kriz, talep patlaması)
 - [ ] Çalışanlar ve Ar-Ge
 - [ ] Mobil sürüm (Capacitor ile Android/iOS)

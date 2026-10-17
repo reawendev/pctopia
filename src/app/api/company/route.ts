@@ -8,7 +8,7 @@ export const GET = handle(async (req) => {
   const user = await requireUser(req);
   const state = await loadCompany(user.id);
   if (!state) return { hasCompany: false, isAdmin: user.isAdmin };
-  return { hasCompany: true, isAdmin: user.isAdmin, ...view(state.company, state.owned) };
+  return { hasCompany: true, isAdmin: user.isAdmin, ...view(state.company, state.owned, state.holdings) };
 });
 
 export const POST = handle(async (req) => {
@@ -41,5 +41,5 @@ export const POST = handle(async (req) => {
     if (error.code === "23505") throw new HttpError(409, "Bu şirket adı alınmış");
     throw new HttpError(500, error.message);
   }
-  return { hasCompany: true, isAdmin: user.isAdmin, ...view(data as any, {}) };
+  return { hasCompany: true, isAdmin: user.isAdmin, ...view(data as any, {}, {}) };
 });

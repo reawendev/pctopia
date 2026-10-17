@@ -10,7 +10,7 @@ export const POST = handle(async (req) => {
   for (let attempt = 0; attempt < 3; attempt++) {
     const state = await loadCompany(user.id);
     if (!state) throw new HttpError(404, "Önce şirket kurmalısın");
-    const { company, owned } = state;
+    const { company, owned, holdings } = state;
 
     const now = Date.now();
     const gain = pendingIncome(owned, new Date(company.last_collected_at).getTime(), now);
@@ -24,7 +24,7 @@ export const POST = handle(async (req) => {
       .select("*")
       .maybeSingle();
     if (error) throw new HttpError(500, error.message);
-    if (data) return { collected: gain, ...view(data as any, owned) };
+    if (data) return { collected: gain, ...view(data as any, owned, holdings) };
     // sürüm çakıştı, tekrar dene
   }
   throw new HttpError(409, "Eşzamanlı işlem, tekrar dene");

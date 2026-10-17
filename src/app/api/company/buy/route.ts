@@ -34,7 +34,7 @@ export const POST = handle(async (req) => {
     if (error) throw new HttpError(500, error.message);
     if (ok) {
       const fresh = await loadCompany(user.id);
-      return { spent: cost, ...view(fresh!.company, fresh!.owned) };
+      return { spent: cost, ...view(fresh!.company, fresh!.owned, fresh!.holdings) };
     }
   }
   throw new HttpError(409, "Eşzamanlı işlem, tekrar dene");

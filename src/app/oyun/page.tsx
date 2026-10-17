@@ -5,6 +5,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
 import { Logo } from "@/components/Logo";
+import { Market } from "@/components/Market";
+import type { Holdings } from "@/lib/game/market";
 import { EQUIPMENT, OFFLINE_CAP_HOURS, type CharacterSpec, type LogoSpec } from "@/lib/game/config";
 import { formatCompact, formatMoney, incomePerHour, pendingIncome, unitCost, type Owned } from "@/lib/game/economy";
 import { apiFetch, supabaseBrowser } from "@/lib/supabase/client";
@@ -15,6 +17,8 @@ type State = {
   isAdmin: boolean;
   company: { id: string; name: string; founderName: string; logo: LogoSpec; character: CharacterSpec; cash: number; lastCollectedAt: string };
   owned: Owned;
+  holdings: Holdings;
+  portfolioValue: number;
   incomePerHour: number;
   pending: number;
   netWorth: number;
@@ -27,7 +31,7 @@ type Board = {
   me: { rank: number; netWorth: number } | null;
 };
 
-type Tab = "genel" | "ekipman" | "siralama";
+type Tab = "genel" | "ekipman" | "borsa" | "siralama";
 
 export default function Oyun() {
   const router = useRouter();
@@ -109,7 +113,7 @@ export default function Oyun() {
   const capped = rate > 0 && pending >= rate * OFFLINE_CAP_HOURS;
 
   return (
-    <div className="mx-auto max-w-4xl px-4 pb-24 pt-4">
+    <div className="mx-auto max-w-5xl px-4 pb-24 pt-4">
       <header className="card mb-4 flex items-center gap-3 p-3">
         <Logo spec={company.logo} size={44} />
         <div className="min-w-0 flex-1">
@@ -122,8 +126,8 @@ export default function Oyun() {
         </div>
       </header>
 
-      <nav className="mb-4 grid grid-cols-3 gap-1 rounded-md border border-line bg-panel p-1 text-sm">
-        {([["genel", "Genel"], ["ekipman", "Ekipman"], ["siralama", "Sıralama"]] as [Tab, string][]).map(([k, label]) => (
+      <nav className="mb-4 grid grid-cols-4 gap-1 rounded-md border border-line bg-panel p-1 text-sm">
+        {([["genel", "Genel"], ["ekipman", "Ekipman"], ["borsa", "Borsa"], ["siralama", "Sıralama"]] as [Tab, string][]).map(([k, label]) => (
           <button key={k} onClick={() => setTab(k)} className={`rounded py-2 font-medium ${tab === k ? "bg-raised text-white" : "text-mute"}`}>
             {label}
           </button>
@@ -136,8 +140,9 @@ export default function Oyun() {
             <Avatar spec={company.character} size={240} />
           </div>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <Stat label="Saatlik gelir" value={formatMoney(rate)} />
+              <Stat label="Portföy" value={formatCompact(state.portfolioValue ?? 0)} />
               <Stat label="Net değer" value={formatCompact(state.netWorth)} />
             </div>
             <div className="card p-4">
@@ -204,6 +209,8 @@ export default function Oyun() {
           })}
         </ul>
       )}
+
+      {tab === "borsa" && <Market cash={company.cash} holdings={state.holdings ?? {}} onState={apply} notify={setToast} />}
 
       {tab === "siralama" && (
         <div className="card">

@@ -1,4 +1,5 @@
-import { assetValue, type Owned } from "@/lib/game/economy";
+import { companyNetWorth, loadAllAssets } from "@/lib/server/company";
+import { snapshot } from "@/lib/server/market";
 import { db, handle, HttpError, requireAdmin } from "@/lib/server/supabase";
 
 export const dynamic = "force-dynamic";
@@ -10,19 +11,14 @@ export const GET = handle(async (req) => {
     db().auth.admin.listUsers({ page: 1, perPage: 500 }),
     db().from("profiles").select("id, is_admin, banned, created_at"),
     db().from("companies").select("id, owner_id, name, founder_name, cash, created_at"),
-    db().from("company_equipment").select("company_id, equipment_id, qty"),
+    loadAllAssets(),
   ]);
   if (users.error) throw new HttpError(500, users.error.message);
-  if (profiles.error || companies.error || eq.error) {
-    throw new HttpError(500, (profiles.error || companies.error || eq.error)!.message);
+  if (profiles.error || companies.error) {
+    throw new HttpError(500, (profiles.error || companies.error)!.message);
   }
 
-  const ownedBy = new Map<string, Owned>();
-  for (const r of eq.data ?? []) {
-    const o = ownedBy.get(r.company_id) ?? {};
-    o[r.equipment_id] = r.qty;
-    ownedBy.set(r.company_id, o);
-  }
+  const prices = snapshot().prices;
   const companyByOwner = new Map((companies.data ?? []).map((c) => [c.owner_id, c]));
   const profileById = new Map((profiles.data ?? []).map((p) => [p.id, p]));
 
@@ -41,7 +37,7 @@ export const GET = handle(async (req) => {
             name: c.name,
             founderName: c.founder_name,
             cash: Number(c.cash),
-            netWorth: Number(c.cash) + assetValue(ownedBy.get(c.id) ?? {}),
+            netWorth: companyNetWorth(c.cash, eq.get(c.id)?.owned ?? {}, eq.get(c.id)?.holdings ?? {}, prices),
           }
         : null,
     };
