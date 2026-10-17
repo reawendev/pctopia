@@ -3,6 +3,7 @@ import { snapshot } from "@/lib/server/market";
 import { db, handle, HttpError, requireAdmin } from "@/lib/server/supabase";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 export const GET = handle(async (req) => {
   await requireAdmin(req);

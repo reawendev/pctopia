@@ -3,6 +3,7 @@ import { loadCompany, view } from "@/lib/server/company";
 import { db, handle, HttpError, requireUser } from "@/lib/server/supabase";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 export const GET = handle(async (req) => {
   const user = await requireUser(req);

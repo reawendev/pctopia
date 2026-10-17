@@ -1,6 +1,7 @@
 import { db, handle, HttpError, requireAdmin } from "@/lib/server/supabase";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 const MAX_GRANT = 1_000_000_000_000;
 

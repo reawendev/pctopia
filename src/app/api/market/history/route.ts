@@ -3,6 +3,7 @@ import { history, type Range } from "@/lib/server/market";
 import { handle, HttpError, requireUser } from "@/lib/server/supabase";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 const RANGES: Range[] = ["1g", "1h", "1a"];
 

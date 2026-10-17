@@ -9,7 +9,12 @@ export function db(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new HttpError(500, "Sunucu ayarları eksik (SUPABASE_SERVICE_ROLE_KEY)");
-  admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  admin = createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    // Next.js 14, yalnızca GET içeren route'lardaki fetch'leri kalıcı önbelleğe alır.
+    // Oyun verisi her istekte güncel okunmalı.
+    global: { fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }) },
+  });
   return admin;
 }
 

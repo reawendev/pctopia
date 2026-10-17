@@ -5,6 +5,7 @@ import { snapshot } from "@/lib/server/market";
 import { db, handle, HttpError, requireUser } from "@/lib/server/supabase";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 const MAX_SHARES = 1_000_000_000;
 

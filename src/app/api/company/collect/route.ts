@@ -3,6 +3,7 @@ import { pendingIncome } from "@/lib/game/economy";
 import { db, handle, HttpError, requireUser } from "@/lib/server/supabase";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 export const POST = handle(async (req) => {
   const user = await requireUser(req);
