@@ -1,5 +1,5 @@
-import { loadCompany, view } from "@/lib/server/company";
-import { pendingIncome } from "@/lib/game/economy";
+import { loadCompany, loadJournal, logEvent, view } from "@/lib/server/company";
+import { formatMoney, pendingIncome } from "@/lib/game/economy";
 import { db, handle, HttpError, requireUser } from "@/lib/server/supabase";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +25,11 @@ export const POST = handle(async (req) => {
       .select("*")
       .maybeSingle();
     if (error) throw new HttpError(500, error.message);
-    if (data) return { collected: gain, ...view(data as any, owned, holdings) };
+    if (data) {
+      if (gain > 0) await logEvent(company.id, "collect", `Muhasebe ${formatMoney(gain)} tahsilat yaptı.`, gain);
+      const journal = await loadJournal(company.id);
+      return { collected: gain, journal, ...view(data as any, owned, holdings) };
+    }
     // sürüm çakıştı, tekrar dene
   }
   throw new HttpError(409, "Eşzamanlı işlem, tekrar dene");

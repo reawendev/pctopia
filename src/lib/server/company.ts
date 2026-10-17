@@ -13,6 +13,9 @@ export type CompanyRow = {
   cash: number;
   last_collected_at: string;
   version: number;
+  created_at?: string;
+  portrait_url?: string | null;
+  logo_url?: string | null;
 };
 
 /** Göç (002_borsa.sql) henüz çalıştırılmadıysa tablo yoktur; oyunu kırmadan boş kabul ederiz. */
@@ -83,6 +86,9 @@ export function view(company: CompanyRow, owned: Owned, holdings: Holdings) {
       character: company.character,
       cash: Number(company.cash),
       lastCollectedAt: company.last_collected_at,
+      createdAt: company.created_at ?? null,
+      portraitUrl: company.portrait_url ?? null,
+      logoUrl: company.logo_url ?? null,
     },
     owned,
     holdings,
@@ -92,4 +98,28 @@ export function view(company: CompanyRow, owned: Owned, holdings: Holdings) {
     netWorth: companyNetWorth(company.cash, owned, holdings, prices),
     serverTime: now,
   };
+}
+
+// ---- Şirket günlüğü ----
+
+export type JournalEntry = { id: number; kind: string; text: string; amount: number | null; at: string };
+
+/** Günlüğe kayıt düşer. Başarısız olursa oyunu durdurmaz. */
+export async function logEvent(companyId: string, kind: string, text: string, amount?: number): Promise<void> {
+  const { error } = await db().from("company_events").insert({ company_id: companyId, kind, text, amount: amount ?? null });
+  if (error && !isMissingTable(error)) console.error("logEvent", error.message);
+}
+
+export async function loadJournal(companyId: string, limit = 20): Promise<JournalEntry[]> {
+  const { data, error } = await db()
+    .from("company_events")
+    .select("id, kind, text, amount, created_at")
+    .eq("company_id", companyId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) {
+    if (!isMissingTable(error)) console.error("loadJournal", error.message);
+    return [];
+  }
+  return (data ?? []).map((e) => ({ id: e.id, kind: e.kind, text: e.text, amount: e.amount === null ? null : Number(e.amount), at: e.created_at }));
 }

@@ -40,6 +40,8 @@ export const HAIR_STYLES = ["short", "side", "long", "bald"] as const;
 export const HAIR_COLORS = ["#1a1411", "#4a2f1b", "#8a5a2b", "#c9a15a", "#9ca3af", "#7c2d12"] as const;
 export const SUITS = ["#1f2937", "#0f2a43", "#3b1d2a", "#14352a", "#44403c"] as const;
 export const ACCESSORIES = ["none", "glasses", "beard"] as const;
+export const GENDERS = ["man", "woman"] as const;
+export const AGES = ["young", "middle", "senior"] as const;
 
 export type LogoSpec = {
   shape: (typeof LOGO_SHAPES)[number];
@@ -54,6 +56,9 @@ export type CharacterSpec = {
   hairColor: string;
   suit: string;
   accessory: (typeof ACCESSORIES)[number];
+  // Sonradan eklendi; eski kayıtlarda olmayabilir
+  gender?: (typeof GENDERS)[number];
+  age?: (typeof AGES)[number];
 };
 
 export const DEFAULT_LOGO: LogoSpec = { shape: "hex", symbol: "chip", color: LOGO_COLORS[0], bg: LOGO_BG[0] };
@@ -63,6 +68,8 @@ export const DEFAULT_CHARACTER: CharacterSpec = {
   hairColor: HAIR_COLORS[0],
   suit: SUITS[0],
   accessory: "none",
+  gender: "man",
+  age: "middle",
 };
 
 export function isValidLogo(x: any): x is LogoSpec {
@@ -82,6 +89,8 @@ export function isValidCharacter(x: any): x is CharacterSpec {
     (HAIR_STYLES as readonly string[]).includes(x.hair) &&
     (HAIR_COLORS as readonly string[]).includes(x.hairColor) &&
     (SUITS as readonly string[]).includes(x.suit) &&
-    (ACCESSORIES as readonly string[]).includes(x.accessory)
+    (ACCESSORIES as readonly string[]).includes(x.accessory) &&
+    (x.gender === undefined || (GENDERS as readonly string[]).includes(x.gender)) &&
+    (x.age === undefined || (AGES as readonly string[]).includes(x.age))
   );
 }

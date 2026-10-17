@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PriceChart, Sparkline } from "./PriceChart";
-import { formatCompact, formatMoney } from "@/lib/game/economy";
+import { formatCompactMoney, formatMoney } from "@/lib/game/economy";
 import {
   buyTotal,
   formatPct,
@@ -134,7 +134,7 @@ export function Market({
       const r = await apiFetch("/api/market/trade", { method: "POST", body: JSON.stringify({ stockId: selected, side, shares: n }) });
       onState(r);
       notify(
-        `${n.toLocaleString("tr-TR")} ${selected} ${side === "buy" ? "alındı" : "satıldı"} · ${formatPrice(r.trade.price)} · toplam ${formatMoney(r.trade.total)}`
+        `${n.toLocaleString("tr-TR")} adet ${selected} ${side === "buy" ? "alındı" : "satıldı"}, ${formatPrice(r.trade.price)} fiyattan. Toplam ${formatMoney(r.trade.total)}.`
       );
       setQty("");
       load().catch(() => {});
@@ -155,18 +155,18 @@ export function Market({
       {/* Portföy özeti */}
       <div className="grid grid-cols-3 gap-3">
         <div className="card p-3">
-          <div className="text-[10px] uppercase tracking-wider text-mute">Portföy</div>
-          <div className="num mt-1 font-semibold">{formatCompact(portfolio.value)}</div>
+          <div className="text-xs text-mute">Portföy</div>
+          <div className="num mt-1 font-semibold">{formatCompactMoney(portfolio.value)}</div>
         </div>
         <div className="card p-3">
-          <div className="text-[10px] uppercase tracking-wider text-mute">Kâr / Zarar</div>
+          <div className="text-xs text-mute">Kâr / Zarar</div>
           <div className={`num mt-1 font-semibold ${pnlClass(portfolio.pnl)}`}>
             {portfolio.pnl > 0 ? "+" : ""}
-            {formatCompact(portfolio.pnl)}
+            {formatCompactMoney(portfolio.pnl)}
           </div>
         </div>
         <div className="card p-3">
-          <div className="text-[10px] uppercase tracking-wider text-mute">Sonraki fiyat</div>
+          <div className="text-xs text-mute">Sonraki fiyat</div>
           <div className="num mt-1 font-semibold">
             {mm}:{String(ss).padStart(2, "0")}
           </div>
@@ -181,15 +181,15 @@ export function Market({
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="num rounded border border-line bg-ink px-1.5 py-0.5 text-xs text-amber">{stock.id}</span>
-                  <h2 className="truncate font-semibold">{stock.name}</h2>
+                  <h2 className="heading truncate text-lg">{stock.name}</h2>
                 </div>
                 <div className="mt-1 text-xs text-mute">
-                  {stock.sector} · {RISK_LABEL[stock.risk]}
+                  {stock.sector}, {RISK_LABEL[stock.risk].toLowerCase()}
                 </div>
               </div>
               <div className="text-right">
                 <div className="num text-xl font-semibold">{formatPrice(price)}</div>
-                {q && <div className={`num text-xs ${pnlClass(q.change24h)}`}>{formatPct(q.change24h)} · 24 sa</div>}
+                {q && <div className={`num text-xs ${pnlClass(q.change24h)}`}>son 24 saatte {formatPct(q.change24h)}</div>}
               </div>
             </div>
             <p className="mt-2 text-xs leading-relaxed text-mute">{stock.desc}</p>
@@ -307,7 +307,7 @@ export function Market({
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="card">
-          <h3 className="border-b border-line px-4 py-3 text-sm font-semibold">Piyasa haberleri</h3>
+          <h3 className="border-b border-line px-4 py-3 font-serif font-semibold">Piyasa haberleri</h3>
           {data.news.length === 0 ? (
             <p className="p-4 text-sm text-mute">Son 3 günde önemli bir gelişme yok.</p>
           ) : (
@@ -320,7 +320,7 @@ export function Market({
                       {nw.text}
                     </button>
                     <div className="mt-0.5 text-[11px] text-mute">
-                      <span className="num">{nw.stockId}</span> · {ago(serverNow - nw.at)}
+                      <span className="num">{nw.stockId}</span>, {ago(serverNow - nw.at)}
                     </div>
                   </div>
                 </li>
@@ -330,7 +330,7 @@ export function Market({
         </section>
 
         <section className="card">
-          <h3 className="border-b border-line px-4 py-3 text-sm font-semibold">İşlemlerin</h3>
+          <h3 className="border-b border-line px-4 py-3 font-serif font-semibold">İşlemlerin</h3>
           {data.trades.length === 0 ? (
             <p className="p-4 text-sm text-mute">Henüz işlem yapmadın.</p>
           ) : (

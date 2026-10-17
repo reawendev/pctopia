@@ -1,6 +1,6 @@
 import { EQUIPMENT_BY_ID } from "@/lib/game/config";
-import { pendingIncome, unitCost } from "@/lib/game/economy";
-import { loadCompany, view } from "@/lib/server/company";
+import { formatMoney, pendingIncome, unitCost } from "@/lib/game/economy";
+import { loadCompany, loadJournal, logEvent, view } from "@/lib/server/company";
 import { db, handle, HttpError, requireUser } from "@/lib/server/supabase";
 
 export const dynamic = "force-dynamic";
@@ -34,8 +34,11 @@ export const POST = handle(async (req) => {
     });
     if (error) throw new HttpError(500, error.message);
     if (ok) {
+      const eq = EQUIPMENT_BY_ID[equipmentId];
+      await logEvent(company.id, "equipment", `${eq.name} satın alındı (${qty + 1}. birim), ${formatMoney(cost)}.`, -cost);
       const fresh = await loadCompany(user.id);
-      return { spent: cost, ...view(fresh!.company, fresh!.owned, fresh!.holdings) };
+      const journal = await loadJournal(company.id);
+      return { spent: cost, journal, ...view(fresh!.company, fresh!.owned, fresh!.holdings) };
     }
   }
   throw new HttpError(409, "Eşzamanlı işlem, tekrar dene");

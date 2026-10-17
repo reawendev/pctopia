@@ -1,9 +1,15 @@
 import type { Metadata, Viewport } from "next";
+import "@fontsource/ibm-plex-sans/400.css";
+import "@fontsource/ibm-plex-sans/500.css";
+import "@fontsource/ibm-plex-sans/600.css";
+import "@fontsource/ibm-plex-serif/400.css";
+import "@fontsource/ibm-plex-serif/600.css";
+import "@fontsource/ibm-plex-serif/400-italic.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "PCTopia",
-  description: "Bilgisayar şirketini kur, büyüt, sektörün zirvesine oyna.",
+  description: "Bir garajda kur, holdinge dönüştür. Çok oyunculu bilgisayar şirketi simülasyonu.",
 };
 
 export const viewport: Viewport = {
@@ -11,7 +17,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   viewportFit: "cover",
-  themeColor: "#0a0e13",
+  themeColor: "#0E1828",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

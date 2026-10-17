@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { formatCompact, formatMoney } from "@/lib/game/economy";
+import { formatCompactMoney, formatMoney } from "@/lib/game/economy";
 import { apiFetch } from "@/lib/supabase/client";
 import { useRequireSession } from "@/lib/useSession";
 
@@ -23,10 +23,12 @@ export default function Admin() {
   const [error, setError] = useState("");
   const [q, setQ] = useState("");
   const [msg, setMsg] = useState("");
+  const [pl, setPl] = useState<{ enabled: boolean; balance: number | null; error?: string | null; last24h?: { count: number; usd: number } } | null>(null);
 
   const load = useCallback(async () => {
     try {
       setData(await apiFetch<Data>("/api/admin/players"));
+      apiFetch("/api/admin/pixellab").then(setPl).catch((e) => setPl({ enabled: false, balance: null, error: e.message }));
       setError("");
     } catch (e: any) {
       setError(e.status === 403 ? "Bu sayfa için yönetici yetkin yok." : e.message);
@@ -66,7 +68,7 @@ export default function Admin() {
   return (
     <main className="mx-auto max-w-5xl px-4 py-6">
       <div className="mb-5 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Yönetici Paneli</h1>
+        <h1 className="heading text-2xl">Yönetici paneli</h1>
         <Link href="/oyun" className="text-sm text-mute hover:text-white">← Oyuna dön</Link>
       </div>
 
@@ -78,7 +80,28 @@ export default function Admin() {
             <Tile label="Kullanıcı" value={String(data.stats.users)} />
             <Tile label="Şirket" value={String(data.stats.companies)} />
             <Tile label="Askıda" value={String(data.stats.banned)} />
-            <Tile label="Toplam nakit" value={formatCompact(data.stats.totalCash)} />
+            <Tile label="Toplam nakit" value={formatCompactMoney(data.stats.totalCash)} />
+          </div>
+
+          <div className="card mb-5 flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
+            <div>
+              <div className="font-medium">PixelLab görsel üretimi</div>
+              <div className="text-mute">
+                {!pl
+                  ? "Kontrol ediliyor…"
+                  : !pl.enabled
+                  ? pl.error ?? "Kapalı"
+                  : pl.error
+                  ? `Bağlantı hatası: ${pl.error}`
+                  : `Çalışıyor. Son 24 saatte ${pl.last24h?.count ?? 0} görsel, $${(pl.last24h?.usd ?? 0).toFixed(2)}`}
+              </div>
+            </div>
+            {pl?.balance !== null && pl?.balance !== undefined && (
+              <div className="text-right">
+                <div className="text-xs text-mute">Bakiye</div>
+                <div className="num font-semibold text-amber">${pl.balance.toFixed(2)}</div>
+              </div>
+            )}
           </div>
 
           <input className="input mb-3" placeholder="E-posta, şirket veya kurucu ara…" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -86,7 +109,7 @@ export default function Admin() {
 
           <div className="card overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-sm">
-              <thead className="border-b border-line text-xs uppercase tracking-wider text-mute">
+              <thead className="border-b border-line text-sm text-mute">
                 <tr>
                   <th className="p-3">Oyuncu</th>
                   <th className="p-3">Şirket</th>
@@ -107,7 +130,7 @@ export default function Admin() {
                     </td>
                     <td className="p-3">{p.company ? <>{p.company.name}<div className="text-xs text-mute">{p.company.founderName}</div></> : <span className="text-mute">kurulmadı</span>}</td>
                     <td className="num p-3 text-right">{p.company ? formatMoney(p.company.cash) : "—"}</td>
-                    <td className="num p-3 text-right">{p.company ? formatCompact(p.company.netWorth) : "—"}</td>
+                    <td className="num p-3 text-right">{p.company ? formatCompactMoney(p.company.netWorth) : "—"}</td>
                     <td className="p-3">
                       <div className="flex justify-end gap-2">
                         {p.company && <button className="btn !px-2.5 !py-1.5 text-xs" onClick={() => grant(p)}>Nakit</button>}
@@ -140,7 +163,7 @@ export default function Admin() {
 function Tile({ label, value }: { label: string; value: string }) {
   return (
     <div className="card p-4">
-      <div className="text-[10px] uppercase tracking-wider text-mute">{label}</div>
+      <div className="text-xs text-mute">{label}</div>
       <div className="num mt-1 text-xl font-semibold">{value}</div>
     </div>
   );

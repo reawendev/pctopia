@@ -9,6 +9,7 @@
 1. Supabase'de yeni proje aç. **SQL Editor**'de sırayla çalıştır:
    - `supabase/schema.sql`
    - `supabase/migrations/002_borsa.sql`
+   - `supabase/migrations/003_gorseller_gunluk.sql`
 
    Mevcut bir veritabanını güncelliyorsan yalnızca henüz çalıştırmadığın `migrations/` dosyalarını çalıştır.
 2. `.env.example` dosyasını `.env.local` olarak kopyala, Supabase anahtarlarını gir.
@@ -27,7 +28,18 @@
 
 ## Yayın (Vercel)
 
-Vercel'e bağla, aynı üç ortam değişkenini (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) ekle.
+Vercel'e bağla, ortam değişkenlerini ekle: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` ve isteğe bağlı `PIXELLAB_API_KEY`.
+
+## Görseller (PixelLab)
+
+- Kuruluş ekranında oyuncu seçimlerini yapıp "Portreyi çizdir" / "Armayı çizdir" der; sunucu (`/api/generate`) seçimleri İngilizce bir tarife çevirip (`src/lib/game/prompts.ts`) PixelLab `generate-image-pixflux` uç noktasına gönderir.
+- PNG, Supabase Storage'daki herkese açık `generated` deposuna yazılır; adresi `companies.portrait_url` / `logo_url` sütunlarına kaydedilir.
+- Kişi başı, tür başı 24 saatte 5 üretim hakkı vardır (yöneticiler sınırsız). Her üretim maliyetiyle `asset_generations` tablosuna yazılır; yönetici panelinde bakiye ve son 24 saatin harcaması görünür.
+- Anahtar yoksa ya da üretim başarısız olursa oyun sade SVG portre ve armayla devam eder.
+
+## Bilinen tuzak: Next.js önbelleği
+
+Next.js 14, yalnızca GET içeren route'lardaki `fetch` isteklerini kalıcı olarak önbelleğe alır. Supabase istemcisi bu yüzden `cache: "no-store"` ile kurulur ve her API route'u `fetchCache = "force-no-store"` dışa aktarır. Yeni route eklerken bu satırı unutma.
 
 ## Mimari
 
@@ -59,6 +71,7 @@ Vercel'e bağla, aynı üç ortam değişkenini (`NEXT_PUBLIC_SUPABASE_URL`, `NE
 
 - [x] Çekirdek döngü: şirket kur, ekipman al, gelir topla, sıralama
 - [x] Yönetici paneli
+- [x] PixelLab ile piksel portre ve arma, şirket günlüğü, kariyer basamakları
 - [x] Borsa: otomotiv, savunma, denizcilik, havacılık, enerji, yarı iletken, lojistik, telekom hisseleri
 - [ ] Şirket başarısına bağlı yatırımlar (süreli büyük projeler, ihaleler)
 - [ ] Piyasa olayları (kriz, talep patlaması)

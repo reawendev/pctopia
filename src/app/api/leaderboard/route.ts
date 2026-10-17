@@ -9,7 +9,8 @@ export const GET = handle(async (req) => {
   const user = await requireUser(req);
 
   const [{ data: companies, error }, assets] = await Promise.all([
-    db().from("companies").select("id, owner_id, name, founder_name, logo, cash"),
+    // "*": görsel sütunları göç öncesi yoksa da hata vermesin
+    db().from("companies").select("*"),
     loadAllAssets(),
   ]);
   if (error) throw new HttpError(500, error.message);
@@ -23,6 +24,10 @@ export const GET = handle(async (req) => {
         name: c.name,
         founderName: c.founder_name,
         logo: c.logo,
+        logoUrl: (c.logo_url as string | null) ?? null,
+        portraitUrl: (c.portrait_url as string | null) ?? null,
+        character: c.character,
+        createdAt: c.created_at,
         netWorth: companyNetWorth(c.cash, a.owned, a.holdings, prices),
         isMe: c.owner_id === user.id,
       };

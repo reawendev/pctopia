@@ -1,6 +1,6 @@
-import { pendingIncome } from "@/lib/game/economy";
-import { buyTotal, sellTotal, STOCK_BY_ID } from "@/lib/game/market";
-import { isMissingTable, loadCompany, view } from "@/lib/server/company";
+import { formatMoney, pendingIncome } from "@/lib/game/economy";
+import { buyTotal, formatPrice, sellTotal, STOCK_BY_ID } from "@/lib/game/market";
+import { isMissingTable, loadCompany, loadJournal, logEvent, view } from "@/lib/server/company";
 import { snapshot } from "@/lib/server/market";
 import { db, handle, HttpError, requireUser } from "@/lib/server/supabase";
 
@@ -65,8 +65,18 @@ export const POST = handle(async (req) => {
       throw new HttpError(500, error.message);
     }
     if (ok) {
+      const name = STOCK_BY_ID[stockId].name;
+      await logEvent(
+        company.id,
+        "trade",
+        side === "buy"
+          ? `Yatırım masası ${shares.toLocaleString("tr-TR")} adet ${name} hissesi aldı (${formatPrice(price)}), toplam ${formatMoney(total)}.`
+          : `Yatırım masası ${shares.toLocaleString("tr-TR")} adet ${name} hissesi sattı (${formatPrice(price)}), toplam ${formatMoney(total)}.`,
+        side === "buy" ? -total : total
+      );
       const fresh = await loadCompany(user.id);
-      return { trade: { stockId, side, shares, price, total }, ...view(fresh!.company, fresh!.owned, fresh!.holdings) };
+      const journal = await loadJournal(company.id);
+      return { journal, trade: { stockId, side, shares, price, total }, ...view(fresh!.company, fresh!.owned, fresh!.holdings) };
     }
   }
   throw new HttpError(409, "Eşzamanlı işlem, tekrar dene");

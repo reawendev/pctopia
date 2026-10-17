@@ -73,7 +73,7 @@ export function PriceChart({ points, range }: { points: Pt[]; range: string }) {
       {geo.ticks.map((v) => (
         <g key={v}>
           <line x1={PAD.l} x2={W - PAD.r} y1={geo.y(v)} y2={geo.y(v)} stroke="#222d3b" strokeDasharray="3 4" />
-          <text x={W - PAD.r + 6} y={geo.y(v) + 4} fill="#8593a6" fontSize="13" fontFamily="ui-monospace, monospace">
+          <text x={W - PAD.r + 6} y={geo.y(v) + 4} fill="#8593a6" fontSize="13" fontFamily="IBM Plex Sans, sans-serif">
             {v.toFixed(2)}
           </text>
         </g>
@@ -88,7 +88,7 @@ export function PriceChart({ points, range }: { points: Pt[]; range: string }) {
           <circle cx={geo.x(hover)} cy={geo.y(h.p)} r="4" fill={color} stroke="#0a0e13" strokeWidth="2" />
           <g transform={`translate(${Math.min(geo.x(hover) + 8, W - PAD.r - 136)},${PAD.t})`}>
             <rect width="130" height="42" rx="4" fill="#161e29" stroke="#222d3b" />
-            <text x="8" y="18" fill="#e6ebf2" fontSize="14" fontFamily="ui-monospace, monospace">{formatPrice(h.p)}</text>
+            <text x="8" y="18" fill="#e6ebf2" fontSize="14" fontFamily="IBM Plex Sans, sans-serif">{formatPrice(h.p)}</text>
             <text x="8" y="34" fill="#8593a6" fontSize="12">{timeLabel(h.t, range === "1g" ? "1g" : "1h")}</text>
           </g>
         </g>

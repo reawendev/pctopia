@@ -36,19 +36,24 @@ export function netWorth(cash: number, owned: Owned): number {
 }
 
 const UNITS: [number, string][] = [
-  [1e12, "Tr"],
-  [1e9, "Mr"],
-  [1e6, "Mn"],
-  [1e3, "B"],
+  [1e12, "trilyon"],
+  [1e9, "milyar"],
+  [1e6, "milyon"],
+  [1e3, "bin"],
 ];
 
-/** 1.250.000 -> "1,25 Mn" ; kısa gösterim */
+/** 1.250.000 -> "1,25 milyon" ; kısa gösterim */
 export function formatCompact(n: number): string {
   const abs = Math.abs(n);
   for (const [v, s] of UNITS) {
     if (abs >= v) return (n / v).toLocaleString("tr-TR", { maximumFractionDigits: 2 }) + " " + s;
   }
   return Math.floor(n).toLocaleString("tr-TR");
+}
+
+/** Kısa para gösterimi: "$1,25 milyon" */
+export function formatCompactMoney(n: number): string {
+  return (n < 0 ? "−$" : "$") + formatCompact(Math.abs(n));
 }
 
 export function formatMoney(n: number): string {
