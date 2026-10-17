@@ -104,15 +104,15 @@ export default function SirketProfili({ params }: { params: { id: string } }) {
         <dl className="grid grid-cols-3 gap-px border-t border-line bg-line">
           <div className="bg-panel px-4 py-3">
             <dt className="text-xs text-mute">Net değer</dt>
-            <dd className="num text-lg">{formatCompactMoney(p.netWorth)}</dd>
+            <dd className="num text-base sm:text-lg">{formatCompactMoney(p.netWorth)}</dd>
           </div>
           <div className="bg-panel px-4 py-3">
             <dt className="text-xs text-mute">İtibar</dt>
-            <dd className={`num text-lg ${rep >= 65 ? "text-gain" : rep < 40 ? "text-loss" : ""}`}>{rep} / 100</dd>
+            <dd className={`num text-base sm:text-lg ${rep >= 65 ? "text-gain" : rep < 40 ? "text-loss" : ""}`}>{rep} / 100</dd>
           </div>
           <div className="bg-panel px-4 py-3">
             <dt className="text-xs text-mute">Sıra</dt>
-            <dd className="num text-lg">
+            <dd className="num text-base sm:text-lg">
               {p.rank}
               <span className="text-sm text-mute"> / {p.total}</span>
             </dd>
