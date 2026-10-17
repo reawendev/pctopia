@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Appearance } from "@/components/Appearance";
 import { Feed } from "@/components/Feed";
+import { Finance } from "@/components/Finance";
+import { Properties } from "@/components/Properties";
 import { Icon } from "@/components/Icon";
 import { Life } from "@/components/Life";
 import { Mailbox, type InboxData } from "@/components/Mailbox";
@@ -45,16 +48,19 @@ type State = {
   pending: number;
   netWorth: number;
   serverTime: number;
+  capHours?: number;
+  staff?: string[];
 };
 
 type BoardRow = { id: string; rank: number; name: string; founderName: string; logo: LogoSpec; logoUrl: string | null; netWorth: number; reputation: number; isMe: boolean };
 type Board = { total: number; top: BoardRow[]; me: { rank: number; netWorth: number } | null };
 
-type Tab = "ofis" | "uretim" | "borsa" | "posta" | "hayat" | "gundem";
+type Tab = "ofis" | "uretim" | "borsa" | "finans" | "posta" | "hayat" | "gundem";
 const TABS: [Tab, string][] = [
   ["ofis", "Ofis"],
   ["uretim", "Üretim"],
   ["borsa", "Borsa"],
+  ["finans", "Finans"],
   ["posta", "Posta"],
   ["hayat", "Hayat"],
   ["gundem", "Gündem"],
@@ -71,7 +77,9 @@ export default function Oyun() {
   const [journal, setJournal] = useState<JournalEntry[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [tab, setTab] = useState<Tab>("ofis");
-  const [sub, setSub] = useState<{ uretim: "donanim" | "atolye"; gundem: "akis" | "siralama" | "seref" }>({ uretim: "donanim", gundem: "akis" });
+  const [sub, setSub] = useState<{ uretim: "donanim" | "atolye"; gundem: "akis" | "siralama" | "seref"; hayat: "iliskiler" | "mulkler" }>({ uretim: "donanim", gundem: "akis", hayat: "iliskiler" });
+  const [dealTo, setDealTo] = useState<string | null>(null);
+  const [mailTo, setMailTo] = useState<string | null>(null);
   const [world, setWorld] = useState<WorldData | null>(null);
   const [now, setNow] = useState(Date.now());
   const [skew, setSkew] = useState(0); // sunucu saati - istemci saati
@@ -107,6 +115,23 @@ export default function Oyun() {
   useEffect(() => {
     if (ready) load().catch((e) => setToast(e.message));
   }, [ready, load]);
+
+  // Profil sayfasından gelen bağlantılar: ?sekme=finans&anlasma=<şirket>
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const t = q.get("sekme") as Tab | null;
+    if (t && TABS.some(([k]) => k === t)) setTab(t);
+    const mt = q.get("kime");
+    if (mt) {
+      setTab("posta");
+      setMailTo(mt);
+    }
+    const to = q.get("anlasma");
+    if (to) {
+      setTab("finans");
+      setDealTo(to);
+    }
+  }, []);
 
   const hasState = !!state;
   useEffect(() => {
@@ -147,7 +172,7 @@ export default function Oyun() {
 
   const pending = useMemo(() => {
     if (!state) return 0;
-    return pendingIncome(state.owned, new Date(state.company.lastCollectedAt).getTime(), now + skew);
+    return pendingIncome(state.owned, new Date(state.company.lastCollectedAt).getTime(), now + skew, state.capHours ?? OFFLINE_CAP_HOURS);
   }, [state, now, skew]);
 
   async function act(path: string, body?: object, okMsg?: (r: any) => string) {
@@ -172,11 +197,14 @@ export default function Oyun() {
 
   const { company, owned } = state;
   const rate = incomePerHour(owned);
-  const capped = rate > 0 && pending >= rate * OFFLINE_CAP_HOURS;
+  const cap = state.capHours ?? OFFLINE_CAP_HOURS;
+  const capped = rate > 0 && pending >= rate * cap;
+  const autoCollect = state.staff?.includes("muhasebeci");
   const career = stageFor(state.netWorth);
   const day = dayNumber(company.createdAt, now + skew);
   const serverNow = now + skew;
   const unread = inbox ? inbox.unread.offers + inbox.unread.messages : 0;
+  const pendingDeals = inbox?.pendingDeals ?? 0;
   const waiting = inbox ? inbox.offers.filter((o) => o.status === "open").length : 0;
   const rep = company.reputation ?? 50;
 
@@ -191,7 +219,7 @@ export default function Oyun() {
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-1.5">
               <CompanyMark spec={company.logo} url={company.logoUrl} size={16} title={company.name} />
-              <span className="truncate text-sm font-medium">{company.name}</span>
+              <Link href={`/sirket/${company.id}`} className="truncate text-sm font-medium hover:text-amber">{company.name}</Link>
             </div>
             <div className="truncate text-xs text-mute">
               {company.founderName}, <span className="text-amber-soft">{career.stage.title}</span>
@@ -225,6 +253,7 @@ export default function Oyun() {
               <Icon name={k} className="h-4 w-4" />
               {label}
               {k === "posta" && unread > 0 && <Badge n={unread} />}
+              {k === "finans" && pendingDeals > 0 && <Badge n={pendingDeals} />}
             </button>
           ))}
         </nav>
@@ -244,8 +273,10 @@ export default function Oyun() {
                     {rate === 0
                       ? "Gelir getiren bir donanımın yok. Üretim sekmesinden ilk makineni al."
                       : capped
-                      ? `${OFFLINE_CAP_HOURS} saatlik sınır doldu; tahsilat yapmazsan yeni gelir birikmez.`
-                      : `Saatte ${formatMoney(rate)}, en fazla ${OFFLINE_CAP_HOURS} saat birikir.`}
+                      ? `${cap} saatlik sınır doldu; tahsilat yapmazsan yeni gelir birikmez.`
+                      : autoCollect
+                      ? `Saatte ${formatMoney(rate)}. Muhasebecin 10 dakikada bir kendisi tahsil ediyor.`
+                      : `Saatte ${formatMoney(rate)}, en fazla ${cap} saat birikir.`}
                   </div>
                 </div>
                 <button className="btn btn-primary" disabled={busy || pending <= 0} onClick={() => act("/api/company/collect", {}, (r) => `Tahsilat yapıldı: ${formatMoney(r.collected)}`)}>
@@ -281,6 +312,8 @@ export default function Oyun() {
                 )}
                 <p className="mt-2 font-serif text-[15px] italic text-white/80">{career.stage.scene}</p>
               </section>
+
+              <Appearance character={company.character} logo={company.logo} portraitUrl={company.portraitUrl} logoUrl={company.logoUrl} onState={apply} notify={setToast} />
 
               <section className="card">
                 <div className="flex items-baseline justify-between border-b border-line px-4 py-2.5">
@@ -379,9 +412,23 @@ export default function Oyun() {
 
         {tab === "borsa" && <Market cash={company.cash} holdings={state.holdings ?? {}} onState={apply} notify={setToast} />}
 
-        {tab === "posta" && <Mailbox data={inbox} cash={company.cash} now={serverNow} reload={loadInbox} onState={apply} notify={setToast} />}
+        {tab === "posta" && <Mailbox composeTo={mailTo} data={inbox} cash={company.cash} now={serverNow} reload={loadInbox} onState={apply} notify={setToast} />}
 
-        {tab === "hayat" && <Life cash={company.cash} now={serverNow} onState={apply} notify={setToast} />}
+        {tab === "finans" && <Finance cash={company.cash} now={serverNow} onState={apply} notify={setToast} pendingDeals={pendingDeals} initialTo={dealTo} />}
+
+        {tab === "hayat" && (
+          <div className="space-y-3">
+            <Segmented
+              value={sub.hayat}
+              options={[
+                ["iliskiler", "İlişkiler"],
+                ["mulkler", "Mülkler"],
+              ]}
+              onChange={(v) => setSub((s) => ({ ...s, hayat: v as any }))}
+            />
+            {sub.hayat === "iliskiler" ? <Life cash={company.cash} now={serverNow} onState={apply} notify={setToast} /> : <Properties cash={company.cash} onState={apply} notify={setToast} />}
+          </div>
+        )}
 
         {tab === "gundem" && (
           <div className="space-y-3">
@@ -414,7 +461,9 @@ export default function Oyun() {
                         <CompanyMark spec={c.logo} url={c.logoUrl} size={28} title={c.name} />
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-sm font-medium">
-                            {c.name}
+                            <Link href={`/sirket/${c.id}`} className="hover:text-amber">
+                              {c.name}
+                            </Link>
                             {c.isMe && <span className="ml-2 text-xs text-amber">sen</span>}
                           </div>
                           <div className="truncate text-xs text-mute">
@@ -445,19 +494,19 @@ export default function Oyun() {
       </main>
 
       {/* Mobil alt gezinme */}
-      <nav className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-6 border-t border-line bg-ink/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden" aria-label="Bölümler">
+      <nav className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-7 border-t border-line bg-ink/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden" aria-label="Bölümler">
         {TABS.map(([k, label]) => (
           <button
             key={k}
             onClick={() => (setTab(k), window.scrollTo({ top: 0 }))}
             aria-current={tab === k ? "page" : undefined}
-            className={`relative flex flex-col items-center gap-0.5 py-2 text-[11px] ${tab === k ? "text-amber" : "text-mute"}`}
+            className={`relative flex flex-col items-center gap-0.5 py-2 text-[10px] ${tab === k ? "text-amber" : "text-mute"}`}
           >
             <Icon name={k} />
             {label}
-            {k === "posta" && unread > 0 && (
-              <span className="absolute right-[18%] top-1">
-                <Badge n={unread} />
+            {((k === "posta" && unread > 0) || (k === "finans" && pendingDeals > 0)) && (
+              <span className="absolute right-[12%] top-1">
+                <Badge n={k === "posta" ? unread : pendingDeals} />
               </span>
             )}
           </button>

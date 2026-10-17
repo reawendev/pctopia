@@ -2,6 +2,8 @@ import { db, HttpError } from "./supabase";
 import { snapshot } from "./market";
 import { assetValue, incomePerHour, pendingIncome, type Owned } from "../game/economy";
 import { portfolioValue, type Holdings } from "../game/market";
+import { ACCOUNTANT_CAP_HOURS, depositValue, loanOwed, RESALE, type Role } from "../game/finance";
+import { OFFLINE_CAP_HOURS } from "../game/config";
 
 export type CompanyRow = {
   id: string;
@@ -18,7 +20,37 @@ export type CompanyRow = {
   logo_url?: string | null;
   reputation?: number;
   last_meet_at?: string | null;
+  /** loadCompany tarafından eklenir: banka + mülk değeri (net değere eklenir) */
+  _extra?: number;
+  /** loadCompany tarafından eklenir: gelir birikme sınırı (saat) */
+  _cap?: number;
+  /** loadCompany tarafından eklenir: işe alınmış çalışanlar */
+  _staff?: Role[];
 };
+
+type BankRow = { company_id: string; deposit: number; deposit_at: string; loan_principal: number; loan_rate: number; loan_taken_at: string | null; loan_due_at: string | null; banned_until: string | null };
+
+/** Banka (mevduat − borç) ve statü eşyalarının (%70) net değere katkısı. */
+export function extraWorth(bank: BankRow | null | undefined, statusPrices: number[], now = Date.now()): number {
+  let v = statusPrices.reduce((s, p) => s + Math.floor(Number(p) * RESALE), 0);
+  if (bank) {
+    v += depositValue(Number(bank.deposit), new Date(bank.deposit_at).getTime(), now);
+    if (Number(bank.loan_principal) > 0 && bank.loan_taken_at && bank.loan_due_at) {
+      v -= loanOwed(Number(bank.loan_principal), bank.loan_rate, new Date(bank.loan_taken_at).getTime(), new Date(bank.loan_due_at).getTime(), now);
+    }
+  }
+  return v;
+}
+
+/** 007 göçü yoksa boş döner. */
+async function optional<T>(q: PromiseLike<{ data: T[] | null; error: any }>): Promise<T[]> {
+  const { data, error } = await q;
+  if (error) {
+    if (isMissingTable(error)) return [];
+    throw new HttpError(500, error.message);
+  }
+  return data ?? [];
+}
 
 /** Göç (002_borsa.sql) henüz çalıştırılmadıysa tablo yoktur; oyunu kırmadan boş kabul ederiz. */
 export function isMissingTable(error: { code?: string; message?: string } | null): boolean {
@@ -44,24 +76,40 @@ export async function loadCompany(
   for (const r of eq.data ?? []) owned[r.equipment_id] = r.qty;
   const holdings: Holdings = {};
   for (const r of hold.data ?? []) holdings[r.stock_id] = { shares: Number(r.shares), costBasis: Number(r.cost_basis) };
-  return { company: company as CompanyRow, owned, holdings };
+
+  const [bank, status, staff] = await Promise.all([
+    optional<BankRow>(db().from("bank_accounts").select("*").eq("company_id", company.id)),
+    optional<{ price: number }>(db().from("status_items").select("price").eq("company_id", company.id)),
+    optional<{ role: Role }>(db().from("employees").select("role").eq("company_id", company.id)),
+  ]);
+  const row = company as CompanyRow;
+  row._extra = extraWorth(bank[0], status.map((s) => s.price));
+  row._staff = staff.map((s) => s.role);
+  row._cap = row._staff.includes("muhasebeci") ? ACCOUNTANT_CAP_HOURS : OFFLINE_CAP_HOURS;
+  return { company: row, owned, holdings };
 }
 
 /** Lider tablosu ve yönetici paneli için tüm şirketlerin ekipman + portföy değeri. */
-export async function loadAllAssets(): Promise<Map<string, { owned: Owned; holdings: Holdings }>> {
-  const [eq, hold] = await Promise.all([
+export async function loadAllAssets(): Promise<Map<string, { owned: Owned; holdings: Holdings; extra: number }>> {
+  const [eq, hold, banks, status] = await Promise.all([
     db().from("company_equipment").select("company_id, equipment_id, qty"),
     db().from("company_holdings").select("company_id, stock_id, shares, cost_basis"),
+    optional<BankRow>(db().from("bank_accounts").select("*")),
+    optional<{ company_id: string; price: number }>(db().from("status_items").select("company_id, price")),
   ]);
   if (eq.error) throw new HttpError(500, eq.error.message);
   if (hold.error && !isMissingTable(hold.error)) throw new HttpError(500, hold.error.message);
 
-  const map = new Map<string, { owned: Owned; holdings: Holdings }>();
+  const map = new Map<string, { owned: Owned; holdings: Holdings; extra: number }>();
   const get = (id: string) => {
     let v = map.get(id);
-    if (!v) map.set(id, (v = { owned: {}, holdings: {} }));
+    if (!v) map.set(id, (v = { owned: {}, holdings: {}, extra: 0 }));
     return v;
   };
+  const statusBy = new Map<string, number[]>();
+  for (const s of status) statusBy.set(s.company_id, [...(statusBy.get(s.company_id) ?? []), s.price]);
+  const ids = new Set([...banks.map((b) => b.company_id), ...statusBy.keys()]);
+  for (const id of ids) get(id).extra = extraWorth(banks.find((b) => b.company_id === id), statusBy.get(id) ?? []);
   for (const r of eq.data ?? []) get(r.company_id).owned[r.equipment_id] = r.qty;
   for (const r of hold.data ?? []) {
     get(r.company_id).holdings[r.stock_id] = { shares: Number(r.shares), costBasis: Number(r.cost_basis) };
@@ -70,8 +118,8 @@ export async function loadAllAssets(): Promise<Map<string, { owned: Owned; holdi
 }
 
 /** Nakit + ekipman değeri + portföyün güncel piyasa değeri. */
-export function companyNetWorth(cash: number, owned: Owned, holdings: Holdings, prices = snapshot().prices): number {
-  return Number(cash) + assetValue(owned) + portfolioValue(holdings, prices);
+export function companyNetWorth(cash: number, owned: Owned, holdings: Holdings, prices = snapshot().prices, extra = 0): number {
+  return Number(cash) + assetValue(owned) + portfolioValue(holdings, prices) + extra;
 }
 
 /** İstemciye giden oyun durumu. */
@@ -96,9 +144,12 @@ export function view(company: CompanyRow, owned: Owned, holdings: Holdings) {
     owned,
     holdings,
     incomePerHour: incomePerHour(owned),
-    pending: pendingIncome(owned, last, now),
+    pending: pendingIncome(owned, last, now, company._cap ?? OFFLINE_CAP_HOURS),
+    capHours: company._cap ?? OFFLINE_CAP_HOURS,
+    staff: company._staff ?? [],
+    extraWorth: company._extra ?? 0,
     portfolioValue: portfolioValue(holdings, prices),
-    netWorth: companyNetWorth(company.cash, owned, holdings, prices),
+    netWorth: companyNetWorth(company.cash, owned, holdings, prices, company._extra ?? 0),
     serverTime: now,
   };
 }

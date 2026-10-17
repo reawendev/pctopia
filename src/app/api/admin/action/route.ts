@@ -11,7 +11,7 @@ export const POST = handle(async (req) => {
   const action = String(body.action ?? "");
   const userId = String(body.userId ?? "");
   if (!userId) throw new HttpError(400, "userId gerekli");
-  if (userId === admin.id && action !== "grant") {
+  if (userId === admin.id && action !== "grant" && action !== "removeImages") {
     throw new HttpError(400, "Kendi hesabına bu işlemi uygulayamazsın");
   }
 
@@ -35,6 +35,12 @@ export const POST = handle(async (req) => {
     case "ban":
     case "unban": {
       const { error } = await db().from("profiles").update({ banned: action === "ban" }).eq("id", userId);
+      if (error) throw new HttpError(500, error.message);
+      return { ok: true };
+    }
+    case "removeImages": {
+      // Uygunsuz yüklenen görseli kaldır: şirket sade çizime döner
+      const { error } = await db().from("companies").update({ portrait_url: null, logo_url: null }).eq("owner_id", userId);
       if (error) throw new HttpError(500, error.message);
       return { ok: true };
     }

@@ -38,7 +38,7 @@ export const GET = handle(async (req) => {
             name: c.name,
             founderName: c.founder_name,
             cash: Number(c.cash),
-            netWorth: companyNetWorth(c.cash, eq.get(c.id)?.owned ?? {}, eq.get(c.id)?.holdings ?? {}, prices),
+            netWorth: companyNetWorth(c.cash, eq.get(c.id)?.owned ?? {}, eq.get(c.id)?.holdings ?? {}, prices, eq.get(c.id)?.extra ?? 0),
           }
         : null,
     };

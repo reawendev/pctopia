@@ -27,7 +27,7 @@ export const POST = handle(async (req) => {
 
     const now = Date.now();
     const price = snapshot(now).prices[stockId];
-    const gain = pendingIncome(owned, new Date(company.last_collected_at).getTime(), now);
+    const gain = pendingIncome(owned, new Date(company.last_collected_at).getTime(), now, company._cap);
     const cash = Number(company.cash) + gain;
     const pos = holdings[stockId] ?? { shares: 0, costBasis: 0 };
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { UploadButton } from "@/components/Appearance";
 import { useRouter } from "next/navigation";
 import { CompanyMark, Portrait } from "@/components/Portrait";
 import {
@@ -133,6 +134,7 @@ export default function Kurulus() {
               disabled={generating !== null}
               has={!!portrait}
               label="Portreyi çizdir"
+              upload={<UploadButton kind="portrait" label="Kendi fotoğrafını yükle" notify={setError} disabled={generating !== null} onUploaded={(a) => setPortrait({ id: a.id, url: a.url })} />}
               onGenerate={() => generate("portrait")}
               onClear={() => setPortrait(null)}
             />
@@ -159,6 +161,7 @@ export default function Kurulus() {
               disabled={generating !== null}
               has={!!emblem}
               label="Armayı çizdir"
+              upload={<UploadButton kind="logo" label="Kendi logonu yükle" notify={setError} disabled={generating !== null} onUploaded={(a) => setEmblem({ id: a.id, url: a.url })} />}
               onGenerate={() => generate("logo")}
               onClear={() => setEmblem(null)}
             />
@@ -219,23 +222,29 @@ function GenerateRow(props: {
   disabled: boolean;
   has: boolean;
   label: string;
+  upload: React.ReactNode;
   onGenerate: () => void;
   onClear: () => void;
 }) {
-  if (!props.enabled) {
-    return <p className="mt-5 border-t border-line pt-4 text-sm text-mute">{props.reason ?? "Piksel çizim şu an kapalı. Yukarıdaki seçimlerinle çizilen sade görsel kullanılacak."}</p>;
-  }
   return (
-    <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-line pt-4">
-      <button type="button" className="btn" disabled={props.disabled || props.remaining < 1} onClick={props.onGenerate}>
-        {props.busy ? "Çiziliyor, 30 saniye kadar sürebilir…" : props.has ? "Yeniden çizdir" : props.label}
-      </button>
-      {props.has && !props.busy && (
-        <button type="button" className="text-sm text-mute underline-offset-4 hover:text-white hover:underline" onClick={props.onClear}>
-          Sade görsele dön
-        </button>
-      )}
-      <span className="text-sm text-mute">Bugün {props.remaining} hakkın kaldı</span>
+    <div className="mt-5 space-y-2 border-t border-line pt-4">
+      <div className="flex flex-wrap items-center gap-3">
+        {props.upload}
+        {props.enabled && (
+          <button type="button" className="btn" disabled={props.disabled || props.remaining < 1} onClick={props.onGenerate}>
+            {props.busy ? "Çiziliyor, 30 saniye kadar sürebilir…" : props.has ? "Yeniden çizdir" : props.label}
+          </button>
+        )}
+        {props.has && !props.busy && (
+          <button type="button" className="text-sm text-mute underline-offset-4 hover:text-white hover:underline" onClick={props.onClear}>
+            Sade görsele dön
+          </button>
+        )}
+      </div>
+      <p className="text-xs text-mute">
+        PNG, JPEG ya da WebP, en fazla 1 MB.{" "}
+        {props.enabled ? `PixelLab ile bugün ${props.remaining} çizim hakkın kaldı.` : props.reason ?? "Yüklemezsen yukarıdaki seçimlerinle çizilen sade görsel kullanılır."}
+      </p>
     </div>
   );
 }

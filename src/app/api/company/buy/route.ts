@@ -19,7 +19,7 @@ export const POST = handle(async (req) => {
 
     // Birikmiş geliri önce nakde çevir, sonra satın almayı düş.
     const now = Date.now();
-    const gain = pendingIncome(owned, new Date(company.last_collected_at).getTime(), now);
+    const gain = pendingIncome(owned, new Date(company.last_collected_at).getTime(), now, company._cap);
     const qty = owned[equipmentId] ?? 0;
     const cost = unitCost(equipmentId, qty);
     const cashAfterIncome = Number(company.cash) + gain;
