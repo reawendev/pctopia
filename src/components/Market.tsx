@@ -175,7 +175,7 @@ export function Market({
 
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
         {/* Seçili hisse */}
-        <div ref={detailRef} className="scroll-mt-4 space-y-4 lg:order-2">
+        <div ref={detailRef} className="scroll-mt-20 space-y-4 lg:order-2">
           <section className="card p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">

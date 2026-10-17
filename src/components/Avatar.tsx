@@ -24,9 +24,13 @@ export function Avatar({ spec, size = 120 }: { spec: CharacterSpec; size?: numbe
       <rect width="120" height="120" fill="#161e29" />
       {/* omuzlar ve takım elbise */}
       <path d="M8 120c0-22 16-34 38-38h28c22 4 38 16 38 38z" fill={spec.suit} />
-      {/* gömlek ve kravat */}
+      {/* gömlek; kravat yalnızca erkek görünümde */}
       <path d="M50 82h20l-10 22z" fill="#e5e7eb" />
-      <path d="M57 90h6l2 22-5 5-5-5z" fill="#7f1d1d" />
+      {spec.gender === "woman" ? (
+        <path d="M54 82h12l-6 12z" fill={spec.skin} />
+      ) : (
+        <path d="M57 90h6l2 22-5 5-5-5z" fill="#7f1d1d" />
+      )}
       {/* boyun */}
       <rect x="50" y="68" width="20" height="18" rx="4" fill={spec.skin} />
       <rect x="50" y="68" width="20" height="8" fill={shade} />

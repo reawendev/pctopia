@@ -11,6 +11,7 @@
    - `supabase/migrations/002_borsa.sql`
    - `supabase/migrations/003_gorseller_gunluk.sql`
    - `supabase/migrations/004_teklifler_posta.sql`
+   - `supabase/migrations/005_atolye_sosyal_hayat.sql`
 
    Mevcut bir veritabanını güncelliyorsan yalnızca henüz çalıştırmadığın `migrations/` dosyalarını çalıştır.
 2. `.env.example` dosyasını `.env.local` olarak kopyala, Supabase anahtarlarını gir.
@@ -49,6 +50,26 @@ Vercel'e bağla, ortam değişkenlerini ekle: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_
 
 - Şirketler birbirine konu + metin (en fazla 2000 karakter) gönderebilir; saatte 20 posta sınırı vardır. Gelen kutusu teklifleri ve mesajları birlikte gösterir; okunmamış sayısı Posta sekmesinde rozet olarak görünür.
 
+## PC Atölyesi
+
+- `src/lib/game/workshop.ts` — 4 parça yuvası (işlemci, ekran kartı, bellek, depolama) × 3 kalite. Birim maliyet = parçalar + $60 montaj.
+- Hak ettiği fiyat = parçaların piyasa değeri (maliyet × 1,35) + montaj; işlemci ile ekran kartı arasında iki kademe fark varsa %12 düşük; itibara göre ±%10.
+- Talep = segment tabanı × kariyer basamağı × itibar × fiyat çarpanı. Fiyat/değer ≤ 1 ise talep artar (en fazla 1,6 kat), üstündeyse üstel düşer; **1,5 katın üstünde satış yok**, 2 katın üstü etikete bile yazılamaz.
+- Satışlar gelir gibi tembel hesaplanır (en fazla 12 saat birikir), `settle_sales` ile bir kez kasaya geçer.
+
+## Sosyal medya ve itibar
+
+- `src/lib/server/social.ts` — kurgusal hesaplar (@fiyatavcisi, @donanimcanavari, @teknogundem, @magazinekspres, @piyasakulisi). Fahiş/pahalı/uygun etiket, maliyet altı satış, darboğaz, satış eşikleri, tükenme, ilişki olayları, fidye saldırısı ve ihale kazanımı paylaşım üretir.
+- Her paylaşımın itibar etkisi vardır (−5 … +3). İtibar 0–100, başlangıç 50; satış hızını ve hak edilen fiyatı etkiler. Fiyat tepkisi model başına 30 dakikada en fazla bir kez gelir.
+- Şablonlarda değişkenlere Türkçe ek eklenmez (ek, ismin sesine göre değişir).
+
+## Hayat
+
+- `src/lib/game/life.ts` — 12 kurgusal yetişkin karakter; her birinin mesleği, sevdiği/sevmediği şeyler ve şirkete yararı var.
+- Basamaklar: tanışık (0) → arkadaş (20) → flört (40) → sevgili (60) → nişanlı (yüzük + teklif, 80+ yakınlıkta şansa bağlı) → evli (düğün).
+- Aynı anda tek romantik ilişki. Yakınlık her 8 saatte 1 azalır; nişan/evlilikte 40'ın altına düşmez. Etkinlik bekleme süresi 20 dk, davet 60 dk.
+- Arkadaş ve üstü kişilerin yararları toplanır, partnerinki iki kat: teklif başarısı, kriz kalkanı, basın, parça indirimi, PC talebi (üst sınırlı).
+
 ## Bilinen tuzak: Next.js önbelleği
 
 Next.js 14, yalnızca GET içeren route'lardaki `fetch` isteklerini kalıcı olarak önbelleğe alır. Supabase istemcisi bu yüzden `cache: "no-store"` ile kurulur ve her API route'u `fetchCache = "force-no-store"` dışa aktarır. Yeni route eklerken bu satırı unutma.
@@ -85,6 +106,7 @@ Next.js 14, yalnızca GET içeren route'lardaki `fetch` isteklerini kalıcı ola
 - [x] Yönetici paneli
 - [x] PixelLab ile piksel portre ve arma, şirket günlüğü, kariyer basamakları
 - [x] Dakikalık borsa, 4 kat hızlı gelir, iş teklifleri ve senaryolar, şirketler arası posta
+- [x] Kompakt arayüz, PC Atölyesi, sosyal medya ve itibar, Hayat (ilişkiler)
 - [x] Borsa: otomotiv, savunma, denizcilik, havacılık, enerji, yarı iletken, lojistik, telekom hisseleri
 - [ ] Şirket başarısına bağlı yatırımlar (süreli büyük projeler, ihaleler)
 - [ ] Piyasa olayları (kriz, talep patlaması)

@@ -16,6 +16,8 @@ export type CompanyRow = {
   created_at?: string;
   portrait_url?: string | null;
   logo_url?: string | null;
+  reputation?: number;
+  last_meet_at?: string | null;
 };
 
 /** Göç (002_borsa.sql) henüz çalıştırılmadıysa tablo yoktur; oyunu kırmadan boş kabul ederiz. */
@@ -89,6 +91,7 @@ export function view(company: CompanyRow, owned: Owned, holdings: Holdings) {
       createdAt: company.created_at ?? null,
       portraitUrl: company.portrait_url ?? null,
       logoUrl: company.logo_url ?? null,
+      reputation: company.reputation ?? 50,
     },
     owned,
     holdings,

@@ -1,6 +1,8 @@
 import { isValidCharacter, isValidLogo, START_CASH } from "@/lib/game/config";
 import { formatMoney } from "@/lib/game/economy";
 import { isMissingTable, loadCompany, loadJournal, logEvent, view } from "@/lib/server/company";
+import { gameContext } from "@/lib/server/context";
+import { syncSales } from "@/lib/server/workshop";
 import { db, handle, HttpError, requireUser } from "@/lib/server/supabase";
 
 export const dynamic = "force-dynamic";
@@ -8,8 +10,11 @@ export const fetchCache = "force-no-store";
 
 export const GET = handle(async (req) => {
   const user = await requireUser(req);
-  const state = await loadCompany(user.id);
+  let state = await loadCompany(user.id);
   if (!state) return { hasCompany: false, isAdmin: user.isAdmin };
+  // Bekleyen PC satışlarını kasaya geçir
+  const g = await gameContext(user.id);
+  if (await syncSales(g.ctx)) state = (await loadCompany(user.id))!;
   const journal = await loadJournal(state.company.id);
   return { hasCompany: true, isAdmin: user.isAdmin, journal, ...view(state.company, state.owned, state.holdings) };
 });

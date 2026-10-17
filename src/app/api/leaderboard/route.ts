@@ -28,6 +28,7 @@ export const GET = handle(async (req) => {
         portraitUrl: (c.portrait_url as string | null) ?? null,
         character: c.character,
         createdAt: c.created_at,
+        reputation: (c.reputation as number | undefined) ?? 50,
         netWorth: companyNetWorth(c.cash, a.owned, a.holdings, prices),
         isMe: c.owner_id === user.id,
       };

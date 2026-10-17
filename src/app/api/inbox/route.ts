@@ -1,4 +1,6 @@
-import { companyNetWorth, isMissingTable, loadCompany } from "@/lib/server/company";
+import { isMissingTable } from "@/lib/server/company";
+import { gameContext } from "@/lib/server/context";
+import { syncSales } from "@/lib/server/workshop";
 import { offerView, syncOffers, type OfferRow } from "@/lib/server/offers";
 import { db, handle, HttpError, requireUser } from "@/lib/server/supabase";
 
@@ -9,13 +11,15 @@ type MsgRow = { id: string; from_company: string; to_company: string; subject: s
 
 export const GET = handle(async (req) => {
   const user = await requireUser(req);
-  const state = await loadCompany(user.id);
-  if (!state) throw new HttpError(404, "Önce şirket kurmalısın");
-  const { company, owned, holdings } = state;
+  const g = await gameContext(user.id);
+  const { company, owned } = g;
 
-  const { changed, ready } = await syncOffers(company, owned, companyNetWorth(company.cash, owned, holdings));
+  // Sayfa açıkken 30 sn'de bir çağrılır: PC satışlarını ve teklifleri birlikte günceller
+  const salesChanged = await syncSales(g.ctx);
+  const { changed: offersChanged, ready } = await syncOffers(company, owned, g.netWorth, g.perks);
+  const changed = salesChanged || offersChanged;
   if (!ready) {
-    return { ready: false, offers: [], inbox: [], sent: [], unread: { offers: 0, messages: 0 }, changed: false };
+    return { ready: false, offers: [], inbox: [], sent: [], unread: { offers: 0, messages: 0 }, changed };
   }
 
   const [offers, inbox, sent] = await Promise.all([

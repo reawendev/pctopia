@@ -230,7 +230,7 @@ export function Mailbox({
       </section>
 
       {/* Okuma bölmesi */}
-      <div ref={paneRef} className="scroll-mt-4 lg:sticky lg:top-4 lg:self-start">
+      <div ref={paneRef} className="scroll-mt-20 lg:sticky lg:top-28 lg:self-start">
         {sel?.kind === "compose" ? (
           <Compose
             initialTo={sel.to}

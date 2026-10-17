@@ -9,6 +9,8 @@ import { EQUIPMENT } from "../game/config";
 import { formatMoney, incomePerHour, type Owned } from "../game/economy";
 import { stageFor } from "../game/stages";
 import { isMissingTable, logEvent } from "./company";
+import { postAbout } from "./social";
+import type { Perk } from "../game/life";
 import { db, HttpError } from "./supabase";
 
 export const OFFER_EVERY_MIN = 20; // yeni teklif aralığı
@@ -225,7 +227,7 @@ export type OfferRow = {
 };
 
 /** Seçeneği sonuçlandırır (zar atar) ve nakdi atomik olarak değiştirir. */
-async function settle(o: OfferRow, choice: Choice, status: "done" | "expired"): Promise<boolean> {
+async function settle(o: OfferRow, choice: Choice, status: "done" | "expired", companyName: string, press = 0): Promise<boolean> {
   const success = Math.random() < choice.p;
   const amount = success ? choice.win : choice.lose;
   const text = success ? choice.winText : choice.loseText;
@@ -235,6 +237,8 @@ async function settle(o: OfferRow, choice: Choice, status: "done" | "expired"): 
     // \u2060: tutar satır sonunda bölünmesin
     const sign = amount > 0 ? `+\u2060${formatMoney(amount)}` : amount < 0 ? `−\u2060${formatMoney(-amount)}` : "";
     await logEvent(o.company_id, "offer", `${o.subject}: ${text}${sign ? ` (${sign})` : ""}`, amount);
+    if (o.template === "ransomware" && amount < 0) await postAbout(o.company_id, "ransomware", { company: companyName }, press);
+    if (o.template === "tender" && success) await postAbout(o.company_id, "tender_won", { company: companyName }, press);
   }
   return !!ok;
 }
@@ -243,7 +247,12 @@ async function settle(o: OfferRow, choice: Choice, status: "done" | "expired"): 
  * Teklifleri güncel hale getirir: süresi gelen işleri sonuçlandırır, süresi dolanları kapatır,
  * aralık geldiyse yeni teklif üretir. Göç yapılmadıysa sessizce boş döner.
  */
-export async function syncOffers(company: { id: string; name: string }, owned: Owned, netWorth: number): Promise<{ changed: boolean; ready: boolean }> {
+export async function syncOffers(
+  company: { id: string; name: string },
+  owned: Owned,
+  netWorth: number,
+  perks: Record<Perk, number>
+): Promise<{ changed: boolean; ready: boolean }> {
   const now = Date.now();
   const { data: live, error } = await db()
     .from("company_offers")
@@ -260,12 +269,12 @@ export async function syncOffers(company: { id: string; name: string }, owned: O
   for (const o of (live ?? []) as OfferRow[]) {
     if (o.status === "active" && o.resolves_at && new Date(o.resolves_at).getTime() <= now) {
       const choice = o.choices.find((c) => c.id === o.choice_id);
-      if (choice && (await settle(o, choice, "done"))) changed = true;
+      if (choice && (await settle(o, choice, "done", company.name, perks.press))) changed = true;
     } else if (o.status === "open" && new Date(o.expires_at).getTime() <= now) {
       const tpl = TEMPLATE_BY_ID[o.template];
       const ignore = tpl?.crisis ? o.choices.find((c) => c.id === "ignore") : undefined;
       if (ignore) {
-        if (await settle(o, ignore, "expired")) changed = true;
+        if (await settle(o, ignore, "expired", company.name, perks.press)) changed = true;
       } else {
         await db().rpc("settle_offer", { p_offer: o.id, p_status: "expired", p_amount: 0, p_text: "Yanıt verilmediği için teklifin süresi doldu." });
       }
@@ -285,7 +294,7 @@ export async function syncOffers(company: { id: string; name: string }, owned: O
     const { data: others } = await db().from("companies").select("name").neq("id", company.id).limit(50);
     const names = (others ?? []).map((r) => r.name as string);
     const H = offerUnit(owned);
-    const bonus = successBonus(owned, netWorth);
+    const bonus = Math.min(0.25, successBonus(owned, netWorth) + perks.offer);
     const rows = [];
     for (let i = 0; i < toCreate; i++) {
       const pool = TEMPLATES.filter((t) => !t.needsPartner || names.length > 0);
@@ -293,6 +302,14 @@ export async function syncOffers(company: { id: string; name: string }, owned: O
       const client = CLIENTS[Math.floor(Math.random() * CLIENTS.length)];
       const partner = names.length ? names[Math.floor(Math.random() * names.length)] : null;
       const built = tpl.build({ H, bonus, client, partner });
+      // Kriz kalkanı (avukat, iletişim danışmanı): olumsuz tutarlar küçülür
+      if (perks.shield > 0) {
+        built.choices = built.choices.map((c) => ({
+          ...c,
+          win: c.win < 0 ? -money(-c.win * (1 - perks.shield)) : c.win,
+          lose: c.lose < 0 ? -money(-c.lose * (1 - perks.shield)) : c.lose,
+        }));
+      }
       rows.push({
         company_id: company.id,
         template: tpl.id,
@@ -310,7 +327,7 @@ export async function syncOffers(company: { id: string; name: string }, owned: O
 }
 
 /** Oyuncunun seçimini uygular. Anında sonuçlanan seçenekler hemen kapanır. */
-export async function respondOffer(companyId: string, offerId: string, choiceId: string): Promise<{ offer: OfferRow }> {
+export async function respondOffer(companyId: string, companyName: string, offerId: string, choiceId: string, press = 0): Promise<{ offer: OfferRow }> {
   const { data: o, error } = await db().from("company_offers").select("*").eq("id", offerId).eq("company_id", companyId).maybeSingle();
   if (error) throw new HttpError(500, error.message);
   if (!o) throw new HttpError(404, "Teklif bulunamadı");
@@ -337,7 +354,7 @@ export async function respondOffer(companyId: string, offerId: string, choiceId:
     }
     if (!ok) throw new HttpError(409, "Bu teklif artık yanıtlanamaz");
     if (choice.cost > 0) await logEvent(companyId, "offer", `${offer.subject}: ${formatMoney(choice.cost)} ödendi, sonuç bekleniyor.`, -choice.cost);
-    if (choice.minutes === 0) await settle({ ...offer, status: "active", choice_id: choice.id }, choice, "done");
+    if (choice.minutes === 0) await settle({ ...offer, status: "active", choice_id: choice.id }, choice, "done", companyName, press);
   }
 
   const { data: fresh } = await db().from("company_offers").select("*").eq("id", offer.id).single();
