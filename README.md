@@ -12,6 +12,7 @@
    - `supabase/migrations/003_gorseller_gunluk.sql`
    - `supabase/migrations/004_teklifler_posta.sql`
    - `supabase/migrations/005_atolye_sosyal_hayat.sql`
+   - `supabase/migrations/006_sezonlar.sql`
 
    Mevcut bir veritabanını güncelliyorsan yalnızca henüz çalıştırmadığın `migrations/` dosyalarını çalıştır.
 2. `.env.example` dosyasını `.env.local` olarak kopyala, Supabase anahtarlarını gir.
@@ -54,8 +55,19 @@ Vercel'e bağla, ortam değişkenlerini ekle: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_
 
 - `src/lib/game/workshop.ts` — 4 parça yuvası (işlemci, ekran kartı, bellek, depolama) × 3 kalite. Birim maliyet = parçalar + $60 montaj.
 - Hak ettiği fiyat = parçaların piyasa değeri (maliyet × 1,35) + montaj; işlemci ile ekran kartı arasında iki kademe fark varsa %12 düşük; itibara göre ±%10.
-- Talep = segment tabanı × kariyer basamağı × itibar × fiyat çarpanı. Fiyat/değer ≤ 1 ise talep artar (en fazla 1,6 kat), üstündeyse üstel düşer; **1,5 katın üstünde satış yok**, 2 katın üstü etikete bile yazılamaz.
+- **Ortak pazar:** 4 segment (ofis, oyun, üst segment, iş istasyonu). Segment talebi D = 2 × taban × (1 + 0,5 × (satıcı şirket − 1)) × olay çarpanı. Her ilanın çekiciliği = fiyat çarpanı × itibar × (1 + talep yararı); pazarda ayrıca çekiciliği 1 olan kurgusal rakipler var. Satış hızı = D × çekicilik / (toplam çekicilik + 1). Ucuz ve itibarlı olan pay çalar; fiyat/değer 1,5'in üstünde çekicilik sıfırdır, 2'nin üstü etikete yazılamaz.
+- Pazar listesi 15 sn önbelleklenir (`loadMarket`); fiyat/stok değişikliğinde önbellek temizlenir.
 - Satışlar gelir gibi tembel hesaplanır (en fazla 12 saat birikir), `settle_sales` ile bir kez kasaya geçer.
+
+## Dünya olayları
+
+- `src/lib/game/events.ts` tanımlar, `src/lib/server/events.ts` takvim. Her 8 saatlik dilimin (İstanbul 00/08/16) olayı gizli tohumla seçilir; herkes aynı olayı görür, gelecek tahmin edilemez.
+- Etkiler: segment talebi, parça maliyeti + piyasa değeri, teklif ödülleri, kriz sıklığı.
+- Testte olayı sabitlemek için `EVENT_OVERRIDE=calm` (yayında tanımlama).
+
+## Sezonlar
+
+- Yönetici panelinden "SEZONU BİTİR" yazarak bitirilir (önerilen bitiş: pazartesi 00:00). İlk üç şirket şeref listesine yazılır, `end_season` tüm şirketleri ve oyun verisini tek işlemde siler, yeni sezonu açar. Hesaplar ve yönetici yetkileri kalır.
 
 ## Sosyal medya ve itibar
 
@@ -107,6 +119,7 @@ Next.js 14, yalnızca GET içeren route'lardaki `fetch` isteklerini kalıcı ola
 - [x] PixelLab ile piksel portre ve arma, şirket günlüğü, kariyer basamakları
 - [x] Dakikalık borsa, 4 kat hızlı gelir, iş teklifleri ve senaryolar, şirketler arası posta
 - [x] Kompakt arayüz, PC Atölyesi, sosyal medya ve itibar, Hayat (ilişkiler)
+- [x] Ortak PC pazarı, dünya olayları, sezonlar ve şeref listesi
 - [x] Borsa: otomotiv, savunma, denizcilik, havacılık, enerji, yarı iletken, lojistik, telekom hisseleri
 - [ ] Şirket başarısına bağlı yatırımlar (süreli büyük projeler, ihaleler)
 - [ ] Piyasa olayları (kriz, talep patlaması)

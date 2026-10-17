@@ -11,6 +11,7 @@ import { Market } from "@/components/Market";
 import { CompanyMark, Portrait } from "@/components/Portrait";
 import { Ticker } from "@/components/Ticker";
 import { Workshop } from "@/components/Workshop";
+import { HallOfFame, WorldCard, type WorldData } from "@/components/World";
 import { EQUIPMENT, OFFLINE_CAP_HOURS, type CharacterSpec, type LogoSpec } from "@/lib/game/config";
 import { formatCompactMoney, formatMoney, incomePerHour, pendingIncome, unitCost, type Owned } from "@/lib/game/economy";
 import type { Holdings } from "@/lib/game/market";
@@ -70,7 +71,8 @@ export default function Oyun() {
   const [journal, setJournal] = useState<JournalEntry[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [tab, setTab] = useState<Tab>("ofis");
-  const [sub, setSub] = useState<{ uretim: "donanim" | "atolye"; gundem: "akis" | "siralama" }>({ uretim: "donanim", gundem: "akis" });
+  const [sub, setSub] = useState<{ uretim: "donanim" | "atolye"; gundem: "akis" | "siralama" | "seref" }>({ uretim: "donanim", gundem: "akis" });
+  const [world, setWorld] = useState<WorldData | null>(null);
   const [now, setNow] = useState(Date.now());
   const [skew, setSkew] = useState(0); // sunucu saati - istemci saati
   const [busy, setBusy] = useState(false);
@@ -118,6 +120,15 @@ export default function Oyun() {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  // Dünya gündemi ve sezon: dakikada bir
+  useEffect(() => {
+    if (!ready || !hasState) return;
+    const f = () => apiFetch<WorldData>("/api/world").then(setWorld).catch(() => {});
+    f();
+    const t = setInterval(f, 60_000);
+    return () => clearInterval(t);
+  }, [ready, hasState]);
 
   const showBoard = tab === "gundem" && sub.gundem === "siralama";
   useEffect(() => {
@@ -218,12 +229,13 @@ export default function Oyun() {
           ))}
         </nav>
       </header>
-      <Ticker />
+      <Ticker eventTitle={world?.event.id !== "calm" ? world?.event.title : undefined} />
 
       <main className="mx-auto max-w-6xl px-4 pt-4">
         {tab === "ofis" && (
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_340px]">
             <div className="space-y-3">
+              {world && <WorldCard w={world} now={serverNow} />}
               <section className="card flex flex-wrap items-center gap-x-6 gap-y-3 p-4">
                 <div className="min-w-0 flex-1">
                   <div className="text-xs text-mute">Muhasebe: tahsil edilmeyi bekleyen</div>
@@ -377,11 +389,14 @@ export default function Oyun() {
               value={sub.gundem}
               options={[
                 ["akis", "Sosyal medya"],
-                ["siralama", "Sektör sıralaması"],
+                ["siralama", "Sıralama"],
+                ["seref", "Şeref listesi"],
               ]}
               onChange={(v) => setSub((s) => ({ ...s, gundem: v as any }))}
             />
-            {sub.gundem === "akis" ? (
+            {sub.gundem === "seref" ? (
+              world ? <HallOfFame w={world} /> : <div className="card p-4 text-sm text-mute">Yükleniyor…</div>
+            ) : sub.gundem === "akis" ? (
               <Feed now={serverNow} />
             ) : (
               <section className="card">

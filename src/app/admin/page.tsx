@@ -104,6 +104,8 @@ export default function Admin() {
             )}
           </div>
 
+          <SeasonPanel onDone={load} setMsg={setMsg} />
+
           <input className="input mb-3" placeholder="E-posta, şirket veya kurucu ara…" value={q} onChange={(e) => setQ(e.target.value)} />
           {msg && <p className="mb-3 text-sm text-amber">{msg}</p>}
 
@@ -165,6 +167,47 @@ function Tile({ label, value }: { label: string; value: string }) {
     <div className="card p-4">
       <div className="text-xs text-mute">{label}</div>
       <div className="num mt-1 text-xl font-semibold">{value}</div>
+    </div>
+  );
+}
+
+function SeasonPanel({ onDone, setMsg }: { onDone: () => void; setMsg: (m: string) => void }) {
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [world, setWorld] = useState<{ season: { number: number; startedAt: string; suggestedEndAt: number } | null } | null>(null);
+  useEffect(() => {
+    apiFetch("/api/world").then(setWorld).catch(() => {});
+  }, []);
+  async function end() {
+    setBusy(true);
+    try {
+      const r = await apiFetch<{ newSeason: number; champions: { name: string }[] }>("/api/admin/season", { method: "POST", body: JSON.stringify({ confirm: text }) });
+      setMsg(`Sezon bitti. Şampiyonlar: ${r.champions.map((c) => c.name).join(", ") || "yok"}. Sezon ${r.newSeason} başladı.`);
+      setText("");
+      onDone();
+      apiFetch("/api/world").then(setWorld).catch(() => {});
+    } catch (e: any) {
+      setMsg(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  const due = world?.season && Date.now() >= world.season.suggestedEndAt;
+  return (
+    <div className={`card mb-5 p-4 text-sm ${due ? "border-amber/50" : ""}`}>
+      <div className="font-medium">Sezon {world?.season?.number ?? "…"}</div>
+      <p className="mt-1 text-mute">
+        {world?.season
+          ? `Başlangıç ${new Date(world.season.startedAt).toLocaleString("tr-TR", { dateStyle: "medium", timeStyle: "short" })}. Önerilen bitiş ${new Date(world.season.suggestedEndAt).toLocaleString("tr-TR", { weekday: "long", hour: "2-digit", minute: "2-digit" })}.`
+          : "Sezonlar için veritabanında 006_sezonlar.sql çalıştırılmalı."}
+        {" "}Sezonu bitirince ilk üç şirket şeref listesine yazılır ve tüm şirketler silinir. Hesaplar ve yöneticiler kalır. Bu işlem geri alınamaz.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <input className="input !w-64 !py-2" placeholder="Onay için: SEZONU BİTİR" value={text} onChange={(e) => setText(e.target.value)} />
+        <button className="btn !border-loss !py-2 text-loss" disabled={busy || text !== "SEZONU BİTİR"} onClick={end}>
+          {busy ? "Bitiriliyor…" : "Sezonu bitir"}
+        </button>
+      </div>
     </div>
   );
 }

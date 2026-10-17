@@ -3,7 +3,11 @@ import { fairValue, isValidParts, MAX_LIST_RATIO, MAX_MODELS, MAX_STOCK, unitCos
 import { loadCompany, loadJournal, logEvent, view } from "@/lib/server/company";
 import { gameContext } from "@/lib/server/context";
 import { db, handle, HttpError, requireUser } from "@/lib/server/supabase";
-import { loadModels, modelView, reactToPrice, syncSales, type ModelRow } from "@/lib/server/workshop";
+import { invalidateMarket, loadModels, reactToPrice, syncSales, workshopView, type ModelRow } from "@/lib/server/workshop";
+import { currentEvent } from "@/lib/server/events";
+import { partMultipliers } from "@/lib/game/events";
+
+const mult = () => partMultipliers(currentEvent().effects);
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -13,12 +17,13 @@ const NEED_MIGRATION = "PC Atölyesi için veritabanında 005_atolye_sosyal_haya
 async function listing(userId: string, extra: Record<string, unknown> = {}) {
   const g = await gameContext(userId);
   const models = await loadModels(g.company.id);
-  if (!models) return { ready: false, models: [], reputation: g.reputation, perks: g.perks, ...extra };
+  if (!models) return { ready: false, models: [], market: [], mine: [], reputation: g.reputation, perks: g.perks, ...extra };
   return {
     ready: true,
+    companyId: g.company.id,
     reputation: g.reputation,
     perks: g.perks,
-    models: models.map((m) => modelView(m, g.ctx)),
+    ...(await workshopView(g.ctx, models)),
     ...extra,
   };
 }
@@ -72,7 +77,7 @@ async function apply(userId: string, g: Awaited<ReturnType<typeof gameContext>>,
       if (name.length < 2 || name.length > 30) throw new HttpError(400, "Model adı 2-30 karakter olmalı");
       if (models.some((m) => m.name.toLocaleLowerCase("tr") === name.toLocaleLowerCase("tr"))) throw new HttpError(409, "Bu isimde bir modelin zaten var");
       if (!isValidParts(body.parts)) throw new HttpError(400, "Parça seçimi geçersiz");
-      const fair = fairValue(body.parts, g.reputation);
+      const fair = fairValue(body.parts, g.reputation, mult());
       const price = validPrice(body.price ?? fair, fair);
       const { error } = await db().from("pc_models").insert({ company_id: g.company.id, name, parts: body.parts, price });
       if (error) throw new HttpError(500, error.message);
@@ -85,7 +90,7 @@ async function apply(userId: string, g: Awaited<ReturnType<typeof gameContext>>,
       const qty = Math.trunc(Number(body.qty));
       if (!Number.isFinite(qty) || qty < 1 || qty > 100) throw new HttpError(400, "Tek seferde 1-100 adet üretebilirsin");
       if (m.stock + qty > MAX_STOCK) throw new HttpError(400, `Depo en fazla ${MAX_STOCK} adet alır`);
-      const cost = unitCost(m.parts, g.perks.parts) * qty;
+      const cost = unitCost(m.parts, g.perks.parts, mult()) * qty;
       const { error } = await db().rpc("produce_pc", { p_company: g.company.id, p_model: m.id, p_qty: qty, p_cost: cost });
       if (error) {
         if (/Yetersiz nakit/.test(error.message)) throw new HttpError(400, `Bu üretim için kasada ${formatMoney(cost)} olmalı`);
@@ -100,7 +105,7 @@ async function apply(userId: string, g: Awaited<ReturnType<typeof gameContext>>,
     }
     case "price": {
       const m = find();
-      const fair = fairValue(m.parts, g.reputation);
+      const fair = fairValue(m.parts, g.reputation, mult());
       const price = validPrice(body.price, fair);
       const listed = body.listed === undefined ? m.listed : !!body.listed;
       const patch: Record<string, unknown> = { price, listed };
@@ -124,6 +129,7 @@ async function apply(userId: string, g: Awaited<ReturnType<typeof gameContext>>,
       throw new HttpError(400, "Bilinmeyen işlem");
   }
 
+  invalidateMarket();
   const fresh = await loadCompany(userId);
   const journal = await loadJournal(g.company.id);
   return listing(userId, { message, journal, state: view(fresh!.company, fresh!.owned, fresh!.holdings) });

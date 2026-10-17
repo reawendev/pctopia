@@ -1,5 +1,7 @@
-// PC Atölyesi: oyuncunun tasarladığı toplama PC modelleri, adil değer ve talep.
+// PC Atölyesi: oyuncunun tasarladığı toplama PC modelleri, adil değer ve ORTAK pazar.
 // Saf fonksiyonlar; sunucu ve istemci aynı hesabı yapar.
+
+import type { SegmentId } from "./events";
 
 export type Quality = "low" | "mid" | "high";
 export type Slot = "cpu" | "gpu" | "ram" | "ssd";
@@ -47,9 +49,13 @@ export function isValidParts(x: any): x is Parts {
   return !!x && SLOTS.every((s) => QUALITIES.includes(x[s]));
 }
 
-/** Tek bir birimin üretim maliyeti (indirim oranıyla). */
-export function unitCost(parts: Parts, discount = 0): number {
-  const raw = ASSEMBLY_COST + SLOTS.reduce((s, k) => s + PARTS[k][parts[k]].cost, 0);
+export type PartMult = Partial<Record<Slot, number>>;
+
+const partCost = (k: Slot, q: Quality, mult: PartMult) => PARTS[k][q].cost * (mult[k] ?? 1);
+
+/** Tek bir birimin üretim maliyeti (ilişki indirimi ve dünya olayı fiyat çarpanlarıyla). */
+export function unitCost(parts: Parts, discount = 0, mult: PartMult = {}): number {
+  const raw = ASSEMBLY_COST + SLOTS.reduce((s, k) => s + partCost(k, parts[k], mult), 0);
   return Math.round(raw * (1 - discount));
 }
 
@@ -62,21 +68,33 @@ export function isBottlenecked(parts: Parts): boolean {
   return Math.abs(RANK[parts.cpu] - RANK[parts.gpu]) >= 2;
 }
 
-/** Segment: oyunda ve sosyal medyada nasıl anıldığı. */
-export function segment(parts: Parts): string {
+export const SEGMENTS: Record<SegmentId, { label: string; base: number }> = {
+  ofis: { label: "ofis", base: 1.9 },
+  oyun: { label: "oyun", base: 1.55 },
+  ust: { label: "üst segment oyun", base: 1.25 },
+  is: { label: "iş istasyonu", base: 1.0 },
+};
+export const SEGMENT_IDS: SegmentId[] = ["ofis", "oyun", "ust", "is"];
+
+export function segmentId(parts: Parts): SegmentId {
   const s = performanceScore(parts);
   if (s < 40) return "ofis";
   if (s < 70) return "oyun";
-  if (s < 100) return "üst segment oyun";
-  return "iş istasyonu";
+  if (s < 100) return "ust";
+  return "is";
+}
+
+/** Segment adı: oyunda ve sosyal medyada nasıl anıldığı. */
+export function segment(parts: Parts): string {
+  return SEGMENTS[segmentId(parts)].label;
 }
 
 /**
  * Piyasanın bu modele biçtiği "hak ettiği fiyat".
  * Parçaların piyasa değeri + montaj, darboğazda %12 indirim, itibara göre ±%10.
  */
-export function fairValue(parts: Parts, reputation: number): number {
-  const parts$ = SLOTS.reduce((s, k) => s + PARTS[k][parts[k]].cost * PART_MARKUP, 0);
+export function fairValue(parts: Parts, reputation: number, mult: PartMult = {}): number {
+  const parts$ = SLOTS.reduce((s, k) => s + partCost(k, parts[k], mult) * PART_MARKUP, 0);
   let v = parts$ + ASSEMBLY_COST * 1.5;
   if (isBottlenecked(parts)) v *= 0.88;
   v *= 0.9 + Math.max(0, Math.min(100, reputation)) / 500;
@@ -91,13 +109,56 @@ export function priceFactor(price: number, fair: number): number {
   return Math.exp(-3 * (r - 1));
 }
 
-/** Saatte satılan beklenen adet. */
-export function salesRate(opts: { parts: Parts; price: number; reputation: number; stageLevel: number; demandBonus?: number }): number {
-  const fair = fairValue(opts.parts, opts.reputation);
-  const base = 3 / (1 + performanceScore(opts.parts) / 60); // ucuz segment daha çok satar
-  const stage = 1 + 0.25 * (opts.stageLevel - 1);
-  const rep = 0.6 + Math.max(0, Math.min(100, opts.reputation)) / 125; // itibar 50 → 1,0
-  return base * stage * rep * priceFactor(opts.price, fair) * (1 + (opts.demandBonus ?? 0));
+// ---- Ortak pazar ----
+//
+// Her segmentin saatlik toplam talebi var: D = 2 × taban × (1 + 0,5 × (satıcı şirket sayısı − 1)) × olay çarpanı.
+// Her ilanın bir çekiciliği var: fiyat çarpanı × itibar × (1 + talep yararı). Pazarda ayrıca
+// çekiciliği 1 olan kurgusal rakipler bulunur; böylece tek başına satan da pazarın tamamını alamaz.
+// Satış hızı = D × kendi çekiciliği / (tüm çekicilikler + kurgusal rakipler).
+
+export const OUTSIDE_APPEAL = 1;
+
+export function appeal(price: number, fair: number, reputation: number, demandBonus = 0): number {
+  return priceFactor(price, fair) * (0.6 + Math.max(0, Math.min(100, reputation)) / 125) * (1 + demandBonus);
+}
+
+export function segmentDemand(seg: SegmentId, sellers: number, eventMult = 1): number {
+  return 2 * SEGMENTS[seg].base * (1 + 0.5 * (Math.max(1, sellers) - 1)) * eventMult;
+}
+
+export type Listing = { id: string; companyId: string; seg: SegmentId; appeal: number };
+
+/** Tüm ilanların saatlik satış hızları. */
+export function marketRates(listings: Listing[], eventMult: (seg: SegmentId) => number = () => 1): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const seg of SEGMENT_IDS) {
+    const ls = listings.filter((l) => l.seg === seg && l.appeal > 0);
+    const sellers = new Set(ls.map((l) => l.companyId)).size;
+    const sum = ls.reduce((s, l) => s + l.appeal, 0);
+    const D = segmentDemand(seg, sellers, eventMult(seg));
+    for (const l of ls) out[l.id] = (D * l.appeal) / (sum + OUTSIDE_APPEAL);
+  }
+  for (const l of listings) if (!(l.id in out)) out[l.id] = 0;
+  return out;
+}
+
+/** "Bu fiyatı koysam ne kadar satarım?" tahmini: modelId verilirse o ilanın yerine geçer. */
+export function estimateRate(
+  listings: Listing[],
+  me: { companyId: string; seg: SegmentId; appeal: number; replaceId?: string },
+  eventMult = 1
+): number {
+  const others = listings.filter((l) => l.seg === me.seg && l.id !== me.replaceId);
+  const rates = marketRates([...others, { id: "__me", companyId: me.companyId, seg: me.seg, appeal: me.appeal }], () => eventMult);
+  return rates["__me"] ?? 0;
+}
+
+/** Pazar payı: kendi satış hızının segmentteki tüm satışlara (kurgusal rakipler dahil) oranı. */
+export function marketShare(listings: Listing[], id: string): number {
+  const l = listings.find((x) => x.id === id);
+  if (!l || l.appeal <= 0) return 0;
+  const sum = listings.filter((x) => x.seg === l.seg && x.appeal > 0).reduce((s, x) => s + x.appeal, 0);
+  return l.appeal / (sum + OUTSIDE_APPEAL);
 }
 
 export type PriceVerdict = "fahiş" | "pahalı" | "piyasa" | "uygun" | "kelepir";

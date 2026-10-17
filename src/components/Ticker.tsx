@@ -8,7 +8,7 @@ type Quote = { id: string; price: number; change24h: number };
 type News = { stockId: string; dir: 1 | -1; text: string; tick: number };
 
 /** Ekranın üstünde akan piyasa bandı: fiyatlar ve son manşet. */
-export function Ticker() {
+export function Ticker({ eventTitle }: { eventTitle?: string }) {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [headline, setHeadline] = useState<News | null>(null);
 
@@ -34,6 +34,9 @@ export function Ticker() {
 
   const items = (
     <>
+      {eventTitle && (
+        <span className="mr-10 font-medium text-amber-soft">Gündem: {eventTitle}</span>
+      )}
       {headline && (
         <span className="mr-10 text-white/90">
           <span className={headline.dir > 0 ? "text-gain" : "text-loss"}>{headline.dir > 0 ? "▲" : "▼"}</span> {headline.text}

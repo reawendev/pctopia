@@ -10,6 +10,7 @@ import { formatMoney, incomePerHour, type Owned } from "../game/economy";
 import { stageFor } from "../game/stages";
 import { isMissingTable, logEvent } from "./company";
 import { postAbout } from "./social";
+import { currentEvent } from "./events";
 import type { Perk } from "../game/life";
 import { db, HttpError } from "./supabase";
 
@@ -296,12 +297,18 @@ export async function syncOffers(
     const H = offerUnit(owned);
     const bonus = Math.min(0.25, successBonus(owned, netWorth) + perks.offer);
     const rows = [];
+    const ev = currentEvent().effects;
     for (let i = 0; i < toCreate; i++) {
-      const pool = TEMPLATES.filter((t) => !t.needsPartner || names.length > 0);
+      // Dünya olayı: siber saldırı dalgasında krizler daha sık
+      const pool = TEMPLATES.filter((t) => !t.needsPartner || names.length > 0).map((t) => ({ ...t, weight: t.crisis ? t.weight * (ev.crisisWeight ?? 1) : t.weight }));
       const tpl = pickWeighted(pool);
       const client = CLIENTS[Math.floor(Math.random() * CLIENTS.length)];
       const partner = names.length ? names[Math.floor(Math.random() * names.length)] : null;
       const built = tpl.build({ H, bonus, client, partner });
+      // Dünya olayı: teklif ödülleri çarpanı (yalnızca kazançlar)
+      if (ev.offerReward && ev.offerReward !== 1) {
+        built.choices = built.choices.map((c) => ({ ...c, win: c.win > 0 ? money(c.win * ev.offerReward!) : c.win }));
+      }
       // Kriz kalkanı (avukat, iletişim danışmanı): olumsuz tutarlar küçülür
       if (perks.shield > 0) {
         built.choices = built.choices.map((c) => ({

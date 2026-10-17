@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import {
-  fairValue, isBottlenecked, isValidParts, pendingSales, performanceScore, priceFactor, QUALITIES, salesRate, SLOTS,
-  unitCost, verdict, type Parts,
+  appeal, estimateRate, fairValue, isBottlenecked, isValidParts, marketRates, marketShare, pendingSales, performanceScore, priceFactor,
+  QUALITIES, segmentId, SLOTS, unitCost, verdict, type Listing, type Parts,
 } from "../src/lib/game/workshop";
 import {
   ACTIVITIES, activityGain, effectiveAffection, NPCS, perksFrom, proposalChance, stageOf,
@@ -39,10 +39,32 @@ assert.equal(verdict(fair * 1.2, fair), "pahalı");
 assert.equal(verdict(fair, fair), "piyasa");
 assert.equal(verdict(fair * 0.8, fair), "uygun");
 
-const r1 = salesRate({ parts: low, price: fair, reputation: 50, stageLevel: 1 });
-assert.ok(r1 > 1.5 && r1 < 3, `ekonomik model saatte ~2 satar: ${r1}`);
-assert.ok(salesRate({ parts: low, price: fair, reputation: 90, stageLevel: 1 }) > r1, "itibar satışı artırır");
-assert.ok(salesRate({ parts: low, price: fair, reputation: 50, stageLevel: 1, demandBonus: 0.1 }) > r1);
+// Ortak pazar
+const A = appeal(fair, fair, 50); // adil fiyat, itibar 50 → 1
+assert.ok(Math.abs(A - 1) < 1e-9);
+assert.equal(appeal(fair * 1.6, fair, 50), 0, "fahiş ilanın çekiciliği sıfır");
+const solo = marketRates([{ id: "a", companyId: "A", seg: "ofis", appeal: 1 }]);
+assert.ok(solo.a > 1.5 && solo.a < 2.5, `tek satıcı ofis segmentinde saatte ~1,9: ${solo.a}`);
+// İki eşit rakip: her biri biraz daha az satar ama pazar büyür (toplam artar)
+const duo = marketRates([{ id: "a", companyId: "A", seg: "ofis", appeal: 1 }, { id: "b", companyId: "B", seg: "ofis", appeal: 1 }]);
+assert.ok(duo.a < solo.a && duo.a + duo.b > solo.a, `rekabet: ${duo.a} ${duo.b}`);
+// Ucuz rakip pazarı çalar
+const cheap: Listing[] = [{ id: "a", companyId: "A", seg: "ofis", appeal: 1 }, { id: "b", companyId: "B", seg: "ofis", appeal: appeal(fair * 0.7, fair, 50) }];
+const war = marketRates(cheap);
+assert.ok(war.b > war.a * 1.3, "ucuz satan daha çok satar");
+assert.ok(marketShare(cheap, "b") > marketShare(cheap, "a"));
+// Farklı segmentler birbirini etkilemez
+const mixed = marketRates([{ id: "a", companyId: "A", seg: "ofis", appeal: 1 }, { id: "b", companyId: "B", seg: "is", appeal: 5 }]);
+assert.equal(mixed.a, solo.a);
+// Olay çarpanı
+assert.ok(Math.abs(marketRates([{ id: "a", companyId: "A", seg: "ofis", appeal: 1 }], () => 2).a - solo.a * 2) < 1e-9);
+// Tahmin, gerçekleşen hızla tutarlı
+assert.ok(Math.abs(estimateRate([{ id: "b", companyId: "B", seg: "ofis", appeal: 1 }], { companyId: "A", seg: "ofis", appeal: 1 }) - duo.a) < 1e-9);
+assert.equal(segmentId(low), "ofis");
+assert.equal(segmentId(high), "is");
+// Dünya olayı parça çarpanı maliyeti ve değeri birlikte artırır
+assert.ok(unitCost(high, 0, { gpu: 1.4 }) > unitCost(high));
+assert.ok(fairValue(high, 50, { gpu: 1.4 }) > fairValue(high, 50));
 
 // Tembel satış: kesirli birikim, stok sınırı, 12 saat sınırı
 const t0 = 1_800_000_000_000;
