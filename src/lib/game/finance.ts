@@ -22,8 +22,8 @@ export const SALES_MANAGER_BONUS = 0.15;
 
 // ---- Banka ----
 
-export const LOAN_DAILY_RATE = 0.06; // günlük %6 basit faiz
-export const DEPOSIT_DAILY_RATE = 0.01; // günlük %1
+export const LOAN_DAILY_RATE = 0.12; // günlük %12 basit faiz (mevduattan yüksek olmalı, yoksa kredi alıp yatırmak bedava para olur)
+export const DEPOSIT_DAILY_RATE = 0.1; // günlük %10 basit faiz
 export const LOAN_TERMS = [1, 2, 3]; // gün
 export const LOAN_MIN_LIMIT = 2_000;
 export const BAN_HOURS = 24; // temerrüt sonrası kredi yasağı

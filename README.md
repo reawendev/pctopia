@@ -79,7 +79,7 @@ Vercel'e bağla, ortam değişkenlerini ekle: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_
 
 - `src/lib/game/finance.ts` kuralları, `src/lib/server/finance.ts` tembel hesaplamayı yapar (şirket ve posta isteklerinde çalışır).
 - **Çalışanlar:** muhasebeci (10 dakikada bir kendisi tahsilat yapar, birikme sınırı 24 saat), sekreter (süresi dolmak üzere olan teklifleri en iyi beklenen değerle yanıtlar), satış müdürü (PC talebi +%15), PR uzmanı (olumsuz itibar etkisini yarıya indirir). Maaş saatlik işler; kasa ödeyemezse çalışan istifa eder.
-- **Banka:** günlük %1 mevduat faizi, günlük %6 kredi faizi, 1–3 günlük vade. Kredi sınırı net değerin yarısı (en az $2.000). Vadesinde ödenmeyen kredi kasadan çekilir; kasa yetmezse itibar −10, 24 saat kredi yasağı ve haber.
+- **Banka:** günlük %10 mevduat faizi, günlük %12 kredi faizi (kredi her zaman mevduattan pahalı), 1–3 günlük vade. Kredi sınırı net değerin yarısı (en az $2.000). Vadesinde ödenmeyen kredi kasadan çekilir; kasa yetmezse itibar −10, 24 saat kredi yasağı ve haber.
 - **Mülkler:** ev, araba, saat, tekne, jet. İtibar ve partner yakınlığı verir; değerinin %70'i net değere sayılır ve o fiyata geri satılır.
 - **Oyuncular arası anlaşmalar:** toptan satış (alıcıya "(bayi)" modeli kopyalanır), borç (vade sonunda otomatik tahsil, ödenmezse itibar −10) ve gelir ortaklığı (PC satış gelirinin bir yüzdesi, toplamda en fazla %50). Teklifler 24 saat geçerli.
 
