@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Mailbox, type InboxData } from "@/components/Mailbox";
 import { Market } from "@/components/Market";
 import { CompanyMark, Portrait } from "@/components/Portrait";
 import { Ticker } from "@/components/Ticker";
@@ -52,11 +53,12 @@ type BoardRow = {
 };
 type Board = { total: number; top: BoardRow[]; me: { rank: number; netWorth: number } | null };
 
-type Tab = "ofis" | "donanim" | "borsa" | "sektor";
+type Tab = "ofis" | "donanim" | "borsa" | "posta" | "sektor";
 const TABS: [Tab, string][] = [
   ["ofis", "Ofis"],
   ["donanim", "Donanım"],
   ["borsa", "Borsa"],
+  ["posta", "Posta"],
   ["sektor", "Sektör"],
 ];
 
@@ -72,6 +74,7 @@ export default function Oyun() {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState("");
   const [board, setBoard] = useState<Board | null>(null);
+  const [inbox, setInbox] = useState<InboxData | null>(null);
 
   const apply = useCallback((s: any) => {
     setState(s);
@@ -88,6 +91,21 @@ export default function Oyun() {
     }
     apply(s);
   }, [apply, router]);
+
+  // Posta kutusu: teklifleri sunucuda günceller (yeni teklif, süresi gelen sonuçlar)
+  const loadInbox = useCallback(async () => {
+    const d = await apiFetch<InboxData>("/api/inbox");
+    setInbox(d);
+    if (d.changed) await load(); // bir teklif sonuçlandıysa kasa değişmiştir
+  }, [load]);
+
+  useEffect(() => {
+    if (!ready || !state) return;
+    loadInbox().catch(() => {});
+    const t = setInterval(() => loadInbox().catch(() => {}), 30_000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, !!state, loadInbox]);
 
   useEffect(() => {
     if (ready) load().catch((e) => setToast(e.message));
@@ -142,6 +160,8 @@ export default function Oyun() {
   const capped = rate > 0 && pending >= rate * OFFLINE_CAP_HOURS;
   const career = stageFor(state.netWorth);
   const day = dayNumber(company.createdAt, now + skew);
+  const unread = inbox ? inbox.unread.offers + inbox.unread.messages : 0;
+  const waiting = inbox ? inbox.offers.filter((o) => o.status === "open").length : 0;
 
   return (
     <>
@@ -189,7 +209,7 @@ export default function Oyun() {
           </div>
         </header>
 
-        <nav className="mb-5 grid grid-cols-4 border-b border-line text-sm" aria-label="Bölümler">
+        <nav className="mb-5 grid grid-cols-5 border-b border-line text-sm" aria-label="Bölümler">
           {TABS.map(([k, label]) => (
             <button
               key={k}
@@ -198,6 +218,11 @@ export default function Oyun() {
               className={`-mb-px border-b-2 py-2.5 font-medium transition-colors ${tab === k ? "border-amber text-white" : "border-transparent text-mute hover:text-white"}`}
             >
               {label}
+              {k === "posta" && unread > 0 && (
+                <span className="num ml-1.5 inline-flex min-w-[18px] items-center justify-center rounded-full bg-amber px-1 text-[11px] font-semibold leading-[18px] text-ink" aria-label={`${unread} okunmamış`}>
+                  {unread}
+                </span>
+              )}
             </button>
           ))}
         </nav>
@@ -206,6 +231,17 @@ export default function Oyun() {
           <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
             <div className="space-y-5">
               <p className="font-serif text-lg italic leading-relaxed text-white/85">{career.stage.scene}</p>
+
+              {waiting > 0 && (
+                <section className="card flex flex-wrap items-center justify-between gap-3 border-amber/40 p-4">
+                  <p className="text-sm">
+                    Masanda yanıt bekleyen <span className="font-semibold text-amber">{waiting}</span> iş teklifi var.
+                  </p>
+                  <button className="btn" onClick={() => setTab("posta")}>
+                    Postayı aç
+                  </button>
+                </section>
+              )}
 
               <section className="card p-5">
                 <h2 className="text-sm text-mute">Muhasebe</h2>
@@ -313,6 +349,10 @@ export default function Oyun() {
               })}
             </ul>
           </div>
+        )}
+
+        {tab === "posta" && (
+          <Mailbox data={inbox} cash={company.cash} now={now + skew} reload={loadInbox} onState={apply} notify={setToast} />
         )}
 
         {tab === "borsa" && <Market cash={company.cash} holdings={state.holdings ?? {}} onState={apply} notify={setToast} />}

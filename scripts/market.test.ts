@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { buyTotal, maxAffordable, portfolioValue, sellTotal, STOCKS, TICKS_PER_DAY } from "../src/lib/game/market";
-import { currentTick, history, priceAt, series, snapshot } from "../src/lib/server/market";
+import { currentTick, history, priceAt, series, snapshot, SWITCH_MS } from "../src/lib/server/market";
 
 // Komisyon
 assert.equal(buyTotal(10, 100), 1005);
@@ -28,7 +28,9 @@ for (const s of STOCKS) {
 
   // 90 günde fiyat tabanın çok dışına kaçmamalı (ortalamaya dönüş)
   const ps = series(s.id, now - TICKS_PER_DAY * 90, now).prices;
-  assert.ok(Math.min(...ps) > s.basePrice * 0.3 && Math.max(...ps) < s.basePrice * 3, `${s.id} aralık`);
+  let lo = Infinity, hi = -Infinity;
+  for (const p of ps) { if (p < lo) lo = p; if (p > hi) hi = p; }
+  assert.ok(lo > s.basePrice * 0.3 && hi < s.basePrice * 3, `${s.id} aralık`);
 }
 
 // Anlık görüntü
@@ -41,6 +43,16 @@ for (const q of snap.quotes) assert.equal(q.price, snap.prices[q.id]);
 // Geçmiş
 const h = history("ANKA", "1h");
 assert.ok(h.length > 150 && h.length < 200);
+
+// 5 dk → 1 dk geçişi kesintisiz: geçişin hemen öncesi ve anı, eski 5 dakikalık adımdan farklı değil
+const S = SWITCH_MS / 60_000;
+for (const st of STOCKS) {
+  const { prices: around } = series(st.id, S - 10, S + 10);
+  // Geçişten önceki 5 dakikalık blok içinde fiyat sabit (eski motor)
+  assert.equal(new Set(around.slice(0, 5)).size, 1, `${st.id} eski blok sabit`);
+  // Geçişten sonra dakikalık hareket var ve sıçrama yok (%5'ten küçük)
+  for (let i = 11; i < around.length; i++) assert.ok(Math.abs(around[i] / around[i - 1] - 1) < 0.05, `${st.id} sıçrama`);
+}
 assert.equal(h.at(-1)!.p, snap.prices.ANKA);
 
 console.log("market: tüm testler geçti");

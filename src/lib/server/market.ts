@@ -5,28 +5,44 @@
 // tohumu bilmeyen biri tarafından tahmin edilemez.
 //
 // Model (log fiyat):  log P(n) = μ(n) + x(n)
-//   μ(n): taban fiyat + yavaş döngüler (birkaç gün / haftalık) + çok hafif uzun vadeli büyüme
+//   μ(n): taban fiyat + yavaş döngüler (günler / haftalar) + çok hafif uzun vadeli büyüme
 //   x(n): ortalamaya dönen gürültü (Ornstein–Uhlenbeck) + ara sıra haber şokları
 //
-// x her BLOCK başında WARMUP tik geriden 0 ile başlatılır. θ·WARMUP ≈ 18 olduğundan
-// başlangıç noktasının etkisi e^-18 mertebesindedir, yani hangi aralığı hesaplarsan hesapla
-// aynı tik için aynı fiyatı alırsın.
+// İki "motor" var:
+//   ESKİ: 5 dakikalık tik (oyunun ilk sürümü). SWITCH anından önceki geçmiş bununla üretilir.
+//   YENİ: 1 dakikalık tik. Parametreler, 5 dakikadaki oynaklık aynı kalacak şekilde ölçeklendi.
+// Geçişte fiyat sıçramasın diye yeni motorun log fiyatına L·e^(−θ·t) düzeltmesi eklenir:
+// SWITCH anında fiyat eski motorla birebir aynıdır, fark birkaç gün içinde söner.
 
 import { STOCKS, STOCK_BY_ID, TICK_MS, TICKS_PER_DAY, type Risk } from "../game/market";
 
 const SECRET = process.env.MARKET_SEED || process.env.SUPABASE_SERVICE_ROLE_KEY || "pctopia-dev-seed";
 
-const THETA = 0.003;
-const WARMUP = 6000;
-const BLOCK = TICKS_PER_DAY;
-const EPOCH_TICK = Math.floor(Date.UTC(2026, 9, 17) / TICK_MS); // oyunun açılışı
-const DRIFT = 0.0000015; // tik başına ≈ yılda %17
+const EPOCH_MS = Date.UTC(2026, 9, 17); // oyunun açılışı
+export const SWITCH_MS = Date.UTC(2026, 9, 17, 21, 15, 0); // 5 dk → 1 dk geçişi (18 Ekim 00:15, İstanbul; yayından sonra)
+const DRIFT_PER_5MIN = 0.0000015; // ≈ yılda %17
 
 const RISK_PARAMS: Record<Risk, { sigma: number; a1: number; a2: number; shockP: number; shockSize: number }> = {
+  // Değerler 5 dakikalık tik içindir; yeni motor bunları ölçekler.
   low: { sigma: 0.0018, a1: 0.06, a2: 0.02, shockP: 0.0008, shockSize: 0.04 },
   mid: { sigma: 0.003, a1: 0.1, a2: 0.03, shockP: 0.0012, shockSize: 0.06 },
   high: { sigma: 0.0048, a1: 0.15, a2: 0.05, shockP: 0.0016, shockSize: 0.09 },
 };
+
+type Engine = {
+  tickMs: number;
+  theta: number;
+  warmup: number; // θ·warmup ≈ 15–18: başlangıç noktasının etkisi ihmal edilebilir
+  block: number;
+  sigmaScale: number;
+  shockScale: number;
+};
+
+const OLD: Engine = { tickMs: 5 * 60_000, theta: 0.003, warmup: 6000, block: 288, sigmaScale: 1, shockScale: 1 };
+const NEW: Engine = { tickMs: TICK_MS, theta: 0.0006, warmup: 25_000, block: TICKS_PER_DAY, sigmaScale: 1 / Math.sqrt(5), shockScale: 1 / 5 };
+
+const SWITCH_MIN = Math.floor(SWITCH_MS / TICK_MS);
+const SWITCH_OLD = Math.floor(SWITCH_MS / OLD.tickMs);
 
 // ---- deterministik rastgelelik ----
 
@@ -54,69 +70,131 @@ function gauss(seed: number, n: number): number {
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
 }
 
-// ---- hisse başına sabitler ----
+// ---- hisse başına sabitler (motor başına) ----
 
 type Model = {
   seed: number;
   logBase: number;
-  p: (typeof RISK_PARAMS)[Risk];
+  sigma: number;
+  shockP: number;
+  shockSize: number;
+  a1: number;
+  a2: number;
   P1: number;
   P2: number;
   ph1: number;
   ph2: number;
   drift: number;
+  epochTick: number;
 };
 
 const models = new Map<string, Model>();
 
-function model(id: string): Model {
-  let m = models.get(id);
+function model(e: Engine, id: string): Model {
+  const key = e.tickMs + ":" + id;
+  let m = models.get(key);
   if (m) return m;
   const s = STOCK_BY_ID[id];
   if (!s) throw new Error("Bilinmeyen hisse: " + id);
   const seed = strHash(SECRET + ":" + id);
+  const p = RISK_PARAMS[s.risk];
+  const perDay = 86_400_000 / e.tickMs;
   m = {
     seed,
     logBase: Math.log(s.basePrice),
-    p: RISK_PARAMS[s.risk],
-    P1: Math.floor(TICKS_PER_DAY * (7 + 14 * rand(seed, 0, 10))), // 7–21 gün
-    P2: Math.floor(TICKS_PER_DAY * (2 + 3 * rand(seed, 0, 11))), // 2–5 gün
+    sigma: p.sigma * e.sigmaScale,
+    shockP: p.shockP * e.shockScale,
+    shockSize: p.shockSize,
+    a1: p.a1,
+    a2: p.a2,
+    P1: Math.floor(perDay * (7 + 14 * rand(seed, 0, 10))), // 7–21 gün
+    P2: Math.floor(perDay * (2 + 3 * rand(seed, 0, 11))), // 2–5 gün
     ph1: 2 * Math.PI * rand(seed, 0, 12),
     ph2: 2 * Math.PI * rand(seed, 0, 13),
-    drift: DRIFT * (0.5 + rand(seed, 0, 14)),
+    drift: DRIFT_PER_5MIN * (e.tickMs / OLD.tickMs) * (0.5 + rand(seed, 0, 14)),
+    epochTick: Math.floor(EPOCH_MS / e.tickMs),
   };
-  models.set(id, m);
+  models.set(key, m);
   return m;
 }
 
 function mu(m: Model, n: number): number {
   return (
     m.logBase +
-    m.p.a1 * Math.sin((2 * Math.PI * n) / m.P1 + m.ph1) +
-    m.p.a2 * Math.sin((2 * Math.PI * n) / m.P2 + m.ph2) +
-    m.drift * (n - EPOCH_TICK)
+    m.a1 * Math.sin((2 * Math.PI * n) / m.P1 + m.ph1) +
+    m.a2 * Math.sin((2 * Math.PI * n) / m.P2 + m.ph2) +
+    m.drift * (n - m.epochTick)
   );
 }
 
-export type Shock = { tick: number; dir: 1 | -1; size: number; pick: number };
+type RawShock = { n: number; dir: 1 | -1; size: number; pick: number };
 
-/** [from, to] aralığındaki fiyatlar ve şoklar (her iki uç dahil). */
-export function series(id: string, from: number, to: number): { prices: number[]; shocks: Shock[] } {
-  const m = model(id);
-  const start = Math.floor(from / BLOCK) * BLOCK - WARMUP;
-  const prices: number[] = [];
-  const shocks: Shock[] = [];
+/** Bir motorun [from, to] tikleri için ham log fiyatlar ve şoklar. */
+function engineSeries(e: Engine, id: string, from: number, to: number): { logs: Float64Array; shocks: RawShock[] } {
+  const m = model(e, id);
+  const start = Math.floor(from / e.block) * e.block - e.warmup;
+  const logs = new Float64Array(Math.max(0, to - from + 1));
+  const shocks: RawShock[] = [];
   let x = 0;
   for (let n = start; n <= to; n++) {
-    x = x * (1 - THETA) + m.p.sigma * gauss(m.seed, n);
-    if (rand(m.seed, n, 3) < m.p.shockP) {
+    x = x * (1 - e.theta) + m.sigma * gauss(m.seed, n);
+    if (rand(m.seed, n, 3) < m.shockP) {
       const dir: 1 | -1 = rand(m.seed, n, 4) < 0.5 ? -1 : 1;
-      const size = m.p.shockSize * (0.5 + rand(m.seed, n, 5));
+      const size = m.shockSize * (0.5 + rand(m.seed, n, 5));
       x += dir * size;
-      if (n >= from) shocks.push({ tick: n, dir, size, pick: rand(m.seed, n, 6) });
+      if (n >= from) shocks.push({ n, dir, size, pick: rand(m.seed, n, 6) });
     }
-    if (n >= from) prices.push(Math.max(0.5, Math.round(Math.exp(mu(m, n) + x) * 100) / 100));
+    if (n >= from) logs[n - from] = mu(m, n) + x;
   }
+  return { logs, shocks };
+}
+
+// Geçiş düzeltmesi: L = log P_eski(SWITCH) − log P_yeni_ham(SWITCH)
+const switchGap = new Map<string, number>();
+function gap(id: string): number {
+  let g = switchGap.get(id);
+  if (g === undefined) {
+    const oldLog = engineSeries(OLD, id, SWITCH_OLD, SWITCH_OLD).logs[0];
+    const newLog = engineSeries(NEW, id, SWITCH_MIN, SWITCH_MIN).logs[0];
+    g = oldLog - newLog;
+    switchGap.set(id, g);
+  }
+  return g;
+}
+
+const toPrice = (log: number) => Math.max(0.5, Math.round(Math.exp(log) * 100) / 100);
+
+export type Shock = { tick: number; at: number; dir: 1 | -1; size: number; pick: number };
+
+/** Dakikalık [from, to] aralığındaki fiyatlar ve şoklar (her iki uç dahil). */
+export function series(id: string, from: number, to: number): { prices: number[]; shocks: Shock[] } {
+  const prices: number[] = new Array(Math.max(0, to - from + 1));
+  const shocks: Shock[] = [];
+
+  // Geçişten önceki kısım: eski 5 dakikalık motor, her dakikaya o 5 dakikanın fiyatı
+  if (from < SWITCH_MIN) {
+    const endMin = Math.min(to, SWITCH_MIN - 1);
+    const oFrom = Math.floor((from * TICK_MS) / OLD.tickMs);
+    const oTo = Math.floor((endMin * TICK_MS) / OLD.tickMs);
+    const { logs, shocks: os } = engineSeries(OLD, id, oFrom, oTo);
+    for (let mnt = from; mnt <= endMin; mnt++) prices[mnt - from] = toPrice(logs[Math.floor((mnt * TICK_MS) / OLD.tickMs) - oFrom]);
+    for (const s of os) {
+      const at = s.n * OLD.tickMs;
+      if (at >= from * TICK_MS) shocks.push({ tick: Math.floor(at / TICK_MS), at, dir: s.dir, size: s.size, pick: s.pick });
+    }
+  }
+
+  // Geçişten sonrası: yeni dakikalık motor + sönen düzeltme
+  if (to >= SWITCH_MIN) {
+    const nFrom = Math.max(from, SWITCH_MIN);
+    const { logs, shocks: ns } = engineSeries(NEW, id, nFrom, to);
+    const L = gap(id);
+    for (let mnt = nFrom; mnt <= to; mnt++) {
+      prices[mnt - from] = toPrice(logs[mnt - nFrom] + L * Math.exp(-NEW.theta * (mnt - SWITCH_MIN)));
+    }
+    for (const s of ns) shocks.push({ tick: s.n, at: s.n * TICK_MS, dir: s.dir, size: s.size, pick: s.pick });
+  }
+
   return { prices, shocks };
 }
 
@@ -181,7 +259,7 @@ export type Snapshot = { tick: number; nextTickAt: number; quotes: StockQuote[];
 
 let cached: Snapshot | null = null;
 
-const SPARK_STEP = 3; // 24 saatte 96 nokta
+const SPARK_STEP = 15; // 24 saatte 96 nokta
 const NEWS_DAYS = 3; // haber akışı son 3 günü gösterir
 
 export function snapshot(now = Date.now()): Snapshot {
@@ -205,11 +283,11 @@ export function snapshot(now = Date.now()): Snapshot {
     quotes.push({ id: s.id, price, open24h: open, change24h: price / open - 1, spark });
     prices[s.id] = price;
     for (const sh of shocks) {
-      news.push({ tick: sh.tick, at: sh.tick * TICK_MS, stockId: s.id, dir: sh.dir, impact: sh.dir * sh.size, text: headline(s.id, sh) });
+      news.push({ tick: sh.tick, at: sh.at, stockId: s.id, dir: sh.dir, impact: sh.dir * sh.size, text: headline(s.id, sh) });
     }
   }
 
-  news.sort((a, b) => b.tick - a.tick);
+  news.sort((a, b) => b.at - a.at);
   cached = { tick, nextTickAt: (tick + 1) * TICK_MS, quotes, prices, news: news.slice(0, 12) };
   return cached;
 }
@@ -217,9 +295,9 @@ export function snapshot(now = Date.now()): Snapshot {
 export type Range = "1g" | "1h" | "1a";
 
 const RANGE: Record<Range, { ticks: number; step: number }> = {
-  "1g": { ticks: TICKS_PER_DAY, step: 1 }, // 1 gün, 5 dk
-  "1h": { ticks: TICKS_PER_DAY * 7, step: 12 }, // 1 hafta, saatlik
-  "1a": { ticks: TICKS_PER_DAY * 30, step: 48 }, // 1 ay, 4 saatlik
+  "1g": { ticks: TICKS_PER_DAY, step: 5 }, // 1 gün, 5 dk aralıklı
+  "1h": { ticks: TICKS_PER_DAY * 7, step: 60 }, // 1 hafta, saatlik
+  "1a": { ticks: TICKS_PER_DAY * 30, step: 240 }, // 1 ay, 4 saatlik
 };
 
 export function history(id: string, range: Range, now = Date.now()): { t: number; p: number }[] {

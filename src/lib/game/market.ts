@@ -1,8 +1,8 @@
 // Borsa tanımları. Sunucu ve istemci ortak kullanır.
 // Fiyat modeli ve gizli tohum yalnızca src/lib/server/market.ts içindedir.
 
-export const TICK_MS = 5 * 60_000; // fiyatlar 5 dakikada bir değişir
-export const TICKS_PER_DAY = (24 * 60 * 60_000) / TICK_MS; // 288
+export const TICK_MS = 60_000; // fiyatlar dakikada bir değişir
+export const TICKS_PER_DAY = (24 * 60 * 60_000) / TICK_MS; // 1440
 export const TRADE_FEE = 0.005; // %0,5 komisyon (alışta ve satışta)
 
 export type Risk = "low" | "mid" | "high";
