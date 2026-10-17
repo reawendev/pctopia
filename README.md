@@ -42,6 +42,10 @@ Vercel'e bağla, ortam değişkenlerini ekle: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_
 - Kişi başı, tür başı 24 saatte 5 üretim hakkı vardır (yöneticiler sınırsız). Her üretim maliyetiyle `asset_generations` tablosuna yazılır; yönetici panelinde bakiye ve son 24 saatin harcaması görünür.
 - Anahtar yoksa ya da üretim başarısız olursa oyun sade SVG portre ve armayla devam eder.
 
+## Ekonomi
+
+- Başlangıç sermayesi $3.000. Gelir hızı kademeye göre: ilk iki makine x10, üçüncü ve dördüncü x6, sunucu rafı ve üstü x4 (`src/lib/game/config.ts`). Erken kademeler 1 saatte, geç kademeler 3,5 saatte kendini öder.
+
 ## Teklifler ve senaryolar
 
 - `src/lib/server/offers.ts` — 9 senaryo şablonu (bakım sözleşmesi, kamu ihalesi, acil müdahale, iflas stoğu, melek yatırımcı, fidye yazılımı krizi, banka konsorsiyumu, röportaj, yetenek transferi).
@@ -118,6 +122,7 @@ Next.js 14, yalnızca GET içeren route'lardaki `fetch` isteklerini kalıcı ola
 - `src/lib/game/market.ts` — hisseler, komisyon (%0,5), ortak hesaplar.
 - `src/lib/server/market.ts` — fiyat modeli (yalnızca sunucu). Fiyatlar veritabanına yazılmaz; gizli bir tohumdan dakikalık tikler halinde deterministik hesaplanır. 18 Ekim 2026 00:15'ten (İstanbul) önceki geçmiş eski 5 dakikalık modelden gelir; geçişte fiyat sıçramaz. Böylece herkes aynı fiyatı görür, cron gerekmez, gelecek fiyatlar tahmin edilemez.
 - Model: ortalamaya dönen gürültü + günler/haftalar süren döngüler + hafif uzun vadeli büyüme + ara sıra haber şokları. Şoklar haber akışında başlık olarak görünür.
+- 18 Ekim 2026 03:00'ten (İstanbul) itibaren fiyatlar 20 saniyede bir değişir ve üstüne bir hareket katmanı eklenir: hızlı dalgalanma (yarı ömür ≈ 1 saat) ve %5–30 arası ani sıçrama/çöküşler (8 hissede haftada ≈ 130; birkaç saatte kısmen geri döner). Katman o anda sıfırdan başladığı için geçişte fiyat kopmaz.
 - Tohum `MARKET_SEED` ortam değişkeninden okunur; yoksa service role anahtarından türetilir. **Tohumu değiştirmek tüm fiyat geçmişini değiştirir**, yayındayken dokunma.
 - Net değer = nakit + ekipman değeri (%50) + portföyün güncel piyasa değeri.
 
@@ -136,7 +141,7 @@ Next.js 14, yalnızca GET içeren route'lardaki `fetch` isteklerini kalıcı ola
 - [x] Çekirdek döngü: şirket kur, ekipman al, gelir topla, sıralama
 - [x] Yönetici paneli
 - [x] PixelLab ile piksel portre ve arma, şirket günlüğü, kariyer basamakları
-- [x] Dakikalık borsa, 4 kat hızlı gelir, iş teklifleri ve senaryolar, şirketler arası posta
+- [x] Dakikalık borsa, hızlı gelir, iş teklifleri ve senaryolar, şirketler arası posta
 - [x] Kompakt arayüz, PC Atölyesi, sosyal medya ve itibar, Hayat (ilişkiler)
 - [x] Ortak PC pazarı, dünya olayları, sezonlar ve şeref listesi
 - [x] Oyuncular arası anlaşmalar, çalışanlar, banka, mülkler

@@ -23,7 +23,7 @@ export function Ticker({ eventTitle }: { eventTitle?: string }) {
         })
         .catch(() => {});
     load();
-    const t = setInterval(load, 60_000);
+    const t = setInterval(load, 20_000);
     return () => {
       alive = false;
       clearInterval(t);

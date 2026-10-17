@@ -60,7 +60,7 @@ textarea {
 }
 
 .ticker-track {
-  animation: ticker 60s linear infinite;
+  animation: ticker 45s linear infinite;
 }
 
 .ticker-track:hover {

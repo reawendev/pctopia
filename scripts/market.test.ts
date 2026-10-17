@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { buyTotal, maxAffordable, portfolioValue, sellTotal, STOCKS, TICKS_PER_DAY } from "../src/lib/game/market";
-import { currentTick, history, priceAt, series, snapshot, SWITCH_MS } from "../src/lib/server/market";
+import { currentTick, history, LIVE_MS, priceAt, series, snapshot, SWITCH_MS } from "../src/lib/server/market";
 
 // Komisyon
 assert.equal(buyTotal(10, 100), 1005);
@@ -44,15 +44,32 @@ for (const q of snap.quotes) assert.equal(q.price, snap.prices[q.id]);
 const h = history("ANKA", "1h");
 assert.ok(h.length > 150 && h.length < 200);
 
-// 5 dk → 1 dk geçişi kesintisiz: geçişin hemen öncesi ve anı, eski 5 dakikalık adımdan farklı değil
-const S = SWITCH_MS / 60_000;
+// 5 dk → 1 dk geçişi kesintisiz (tikler artık 20 saniye: 5 dakika = 15 tik)
+const S = SWITCH_MS / 20_000;
 for (const st of STOCKS) {
-  const { prices: around } = series(st.id, S - 10, S + 10);
-  // Geçişten önceki 5 dakikalık blok içinde fiyat sabit (eski motor)
-  assert.equal(new Set(around.slice(0, 5)).size, 1, `${st.id} eski blok sabit`);
-  // Geçişten sonra dakikalık hareket var ve sıçrama yok (%5'ten küçük)
-  for (let i = 11; i < around.length; i++) assert.ok(Math.abs(around[i] / around[i - 1] - 1) < 0.05, `${st.id} sıçrama`);
+  const { prices: around } = series(st.id, S - 30, S + 30);
+  assert.equal(new Set(around.slice(0, 15)).size, 1, `${st.id} eski blok sabit`);
+  for (let i = 31; i < around.length; i++) assert.ok(Math.abs(around[i] / around[i - 1] - 1) < 0.05, `${st.id} sıçrama`);
 }
+
+// Hareket katmanı: LIVE anında kopma yok, sonrasında her 20 saniyede kıpırdıyor, sıçrama/çöküş haberi var
+const LT = LIVE_MS / 20_000;
+for (const st of STOCKS) {
+  const { prices: a } = series(st.id, LT - 3, LT + 3);
+  assert.ok(Math.abs(a[3] / a[2] - 1) < 0.03, `${st.id} canlı geçişte kopma`);
+  const { prices: b } = series(st.id, LT + 1000, LT + 1180);
+  let moves = 0;
+  for (let i = 1; i < b.length; i++) if (b[i] !== b[i - 1]) moves++;
+  assert.ok(moves > 150, `${st.id} 20 sn hareket ${moves}`);
+  const { prices: w } = series(st.id, LT, LT + TICKS_PER_DAY * 60);
+  let lo = Infinity, hi = -Infinity;
+  for (const p of w) { if (p < lo) lo = p; if (p > hi) hi = p; }
+  assert.ok(lo > st.basePrice * 0.2 && hi < st.basePrice * 5, `${st.id} 60 günlük aralık ${lo}-${hi}`);
+}
+let jumps = 0;
+for (const st of STOCKS) jumps += series(st.id, LT, LT + TICKS_PER_DAY * 7).shocks.filter((x) => x.jump).length;
+assert.ok(jumps > 50 && jumps < 400, `haftalık sıçrama/çöküş ${jumps}`);
+console.log(`  bir haftada ${jumps} sıçrama/çöküş (8 hisse)`);
 assert.equal(h.at(-1)!.p, snap.prices.ANKA);
 
 console.log("market: tüm testler geçti");

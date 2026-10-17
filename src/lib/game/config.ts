@@ -1,11 +1,14 @@
 // Oyun dengesi burada. Sunucu ve istemci aynı dosyayı kullanır.
 
-export const START_CASH = 1_000;
+export const START_CASH = 3_000;
 export const OFFLINE_CAP_HOURS = 12; // oyuncu yokken en fazla kaç saatlik gelir birikir
 export const COST_GROWTH = 1.15; // her ek birimde maliyet çarpanı
 export const RESALE_RATIO = 0.5; // sıralamada ekipman değeri oranı
 // Gelir hızı çarpanı: tablodaki taban gelirler bununla çarpılır (4 → makineler kendini 2,5–4,5 saatte öder)
-export const INCOME_SPEED = 4;
+export const INCOME_SPEED = 4; // geç oyun (sunucu rafı ve üstü)
+// Erken oyun daha hızlı: ilk iki kademe x10, üçüncü ve dördüncü x6
+const EARLY = 10;
+const MID = 6;
 
 export type Equipment = {
   id: string;
@@ -17,10 +20,10 @@ export type Equipment = {
 };
 
 export const EQUIPMENT: Equipment[] = [
-  { id: "used-pc", tier: 1, name: "İkinci El Ofis PC", desc: "Eski ama çalışıyor. Her şirket buradan başlar.", baseCost: 400, incomePerHour: 40 * INCOME_SPEED },
-  { id: "office-desktop", tier: 2, name: "Ofis Masaüstü", desc: "Muhasebe ve temel müşteri işleri için.", baseCost: 2_000, incomePerHour: 180 * INCOME_SPEED },
-  { id: "gaming-pc", tier: 3, name: "Yüksek Performanslı PC", desc: "Render ve oyun sunucusu işleri.", baseCost: 9_000, incomePerHour: 750 * INCOME_SPEED },
-  { id: "workstation", tier: 4, name: "Profesyonel İş İstasyonu", desc: "Mühendislik ve tasarım sözleşmeleri.", baseCost: 45_000, incomePerHour: 3_500 * INCOME_SPEED },
+  { id: "used-pc", tier: 1, name: "İkinci El Ofis PC", desc: "Eski ama çalışıyor. Her şirket buradan başlar.", baseCost: 400, incomePerHour: 40 * EARLY },
+  { id: "office-desktop", tier: 2, name: "Ofis Masaüstü", desc: "Muhasebe ve temel müşteri işleri için.", baseCost: 2_000, incomePerHour: 180 * EARLY },
+  { id: "gaming-pc", tier: 3, name: "Yüksek Performanslı PC", desc: "Render ve oyun sunucusu işleri.", baseCost: 9_000, incomePerHour: 750 * MID },
+  { id: "workstation", tier: 4, name: "Profesyonel İş İstasyonu", desc: "Mühendislik ve tasarım sözleşmeleri.", baseCost: 45_000, incomePerHour: 3_500 * MID },
   { id: "server-rack", tier: 5, name: "Sunucu Rafı", desc: "Barındırma hizmeti sunmaya başla.", baseCost: 250_000, incomePerHour: 17_500 * INCOME_SPEED },
   { id: "gpu-cluster", tier: 6, name: "GPU Kümesi", desc: "Yapay zekâ eğitimi ve hesaplama kiralama.", baseCost: 1_500_000, incomePerHour: 95_000 * INCOME_SPEED },
   { id: "data-center", tier: 7, name: "Veri Merkezi", desc: "Kurumsal müşteriler için bölgesel altyapı.", baseCost: 12_000_000, incomePerHour: 700_000 * INCOME_SPEED },
