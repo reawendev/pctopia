@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Appearance } from "@/components/Appearance";
+import { Club } from "@/components/Club";
 import { Facility } from "@/components/Facility";
 import { Feed } from "@/components/Feed";
 import { Finance } from "@/components/Finance";
@@ -80,7 +81,7 @@ export default function Oyun() {
   const [journal, setJournal] = useState<JournalEntry[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [tab, setTab] = useState<Tab>("ofis");
-  const [sub, setSub] = useState<{ uretim: "donanim" | "atolye" | "ihale" | "arge"; gundem: "akis" | "siralama" | "seref"; hayat: "iliskiler" | "mulkler" }>({ uretim: "donanim", gundem: "akis", hayat: "iliskiler" });
+  const [sub, setSub] = useState<{ uretim: "donanim" | "atolye" | "ihale" | "arge"; gundem: "akis" | "siralama" | "seref"; hayat: "iliskiler" | "mulkler" | "kulup" }>({ uretim: "donanim", gundem: "akis", hayat: "iliskiler" });
   const [dealTo, setDealTo] = useState<string | null>(null);
   const [mailTo, setMailTo] = useState<string | null>(null);
   const [world, setWorld] = useState<WorldData | null>(null);
@@ -434,10 +435,17 @@ export default function Oyun() {
               options={[
                 ["iliskiler", "İlişkiler"],
                 ["mulkler", "Mülkler"],
+                ["kulup", "Kulüp"],
               ]}
               onChange={(v) => setSub((s) => ({ ...s, hayat: v as any }))}
             />
-            {sub.hayat === "iliskiler" ? <Life cash={company.cash} now={serverNow} onState={apply} notify={setToast} /> : <Properties cash={company.cash} onState={apply} notify={setToast} />}
+            {sub.hayat === "iliskiler" ? (
+              <Life cash={company.cash} now={serverNow} onState={apply} notify={setToast} />
+            ) : sub.hayat === "mulkler" ? (
+              <Properties cash={company.cash} onState={apply} notify={setToast} />
+            ) : (
+              <Club cash={company.cash} now={serverNow} onState={apply} notify={setToast} />
+            )}
           </div>
         )}
 

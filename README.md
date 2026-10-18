@@ -18,6 +18,7 @@
    - `supabase/migrations/009_ihale_arge.sql`
    - `supabase/migrations/010_tesis_kriz.sql`
    - `supabase/migrations/011_halka_arz_operasyon.sql`
+   - `supabase/migrations/012_kulup_bahis.sql`
 
    Mevcut bir veritabanını güncelliyorsan yalnızca henüz çalıştırmadığın `migrations/` dosyalarını çalıştır.
 2. `.env.example` dosyasını `.env.local` olarak kopyala, Supabase anahtarlarını gir.
@@ -101,6 +102,15 @@ Vercel'e bağla, ortam değişkenlerini ekle: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_
 - Bedel rakibin değerinin %0,4'ü (en az $3.000) × operasyon katsayısı. Başarı ve yakalanma ayrı zarlarla belirlenir. Yakalanan saldırgan itibar −8 kaybeder (PR uzmanı yarıya indirir), haber çıkar ve hedef kimin yaptığını öğrenir; yakalanmazsa hedef yalnızca olanı görür.
 - Sınırlar: saldırgan 6 saatte en fazla 3 operasyon, aynı hedefe 6 saatte 1; son 6 saatte 2 başarılı saldırı alan şirket korunur.
 - Testler için `OPS_TEST_ROLLS` ortam değişkeni zarları sabitler; canlıda tanımlama.
+
+## Kulüp (Hayat → Kulüp)
+
+Hepsi oyun parasıyla; gerçek parayla hiçbir bağlantısı yoktur ve olmamalıdır (oyun içi satın alma eklenirse bu bölüm kaldırılmalı). Kasa her oyunda biraz öndedir; bu, ekonomideki fazla parayı yavaşça emer.
+
+- **Masa oyunları** (`src/lib/game/casino.ts`): Avrupa ruleti (kasa %2,7), iki zar (8+ / 6− ×2,35, tam 7 ×5,8), blackjack (krupiye 17'de durur, blackjack 3:2, ikiye katlama). Zarlar `crypto.randomInt` ile sunucuda atılır; blackjack destesi sunucuda saklanır, krupiyenin kapalı kartı el bitene kadar gönderilmez.
+- **Piyasa bahsi:** bir hisse 15 dk / 1 saat sonra yukarıda mı aşağıda mı? Oran = 0,95 ÷ olasılık; olasılık fiyat modelinin o anki durumundan hesaplanır (`upProbability`), böylece çöküş sonrası "toparlanır" gibi bariz bahisler ucuzlamaz.
+- **Bahis bürosu:** ortak havuzlu bahisler; her gün 21:00 (İstanbul) "sıralamada 1. kim?" (sonuçtan 12 saat önce kapanır) ve her açık ihale için "kim alacak?". Büro %5 alır, kalanı bilenler paylaşır; kimse bilemezse iade.
+- Tek bahis en fazla şirket değerinin %10'u. 24 saatte değerinin %20'sinden (en az $20 bin) fazlasını kaybeden magazine düşer: itibar −3, partnerin yakınlığı −8 (günde bir kez).
 
 ## Dünya olayları
 
@@ -189,5 +199,5 @@ Next.js 14, yalnızca GET içeren route'lardaki `fetch` isteklerini kalıcı ola
 - [x] Halka arz ve gizli operasyonlar
 - [ ] Ar-Ge
 - [ ] Mobil sürüm (Capacitor ile Android/iOS)
-- [ ] Kumar ve bahis (oyun parasıyla)
+- [x] Kulüp: masa oyunları, piyasa bahsi, bahis bürosu
 - [ ] Satın alma ve birleşme, temettü

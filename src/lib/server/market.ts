@@ -219,10 +219,10 @@ const THETA_Y = 0.004; // yarı ömür ≈ 173 tik ≈ 58 dk
 const THETA_J = 0.0004; // yarı ömür ≈ 1733 tik ≈ 9,6 sa
 const LIVE_WARMUP = 75_000; // θ_j · warmup = 30
 
-function liveLayer(id: string, from: number, to: number): { add: Float64Array; jumps: Shock[] } {
+function liveLayer(id: string, from: number, to: number): { add: Float64Array; jumps: Shock[]; y: number; j: number } {
   const add = new Float64Array(Math.max(0, to - from + 1));
   const jumps: Shock[] = [];
-  if (to < LIVE_TICK) return { add, jumps };
+  if (to < LIVE_TICK) return { add, jumps, y: 0, j: 0 };
   const p = LIVE_PARAMS[STOCK_BY_ID[id].risk];
   const seed = strHash(SECRET + ":canli:" + id);
   const start = Math.max(LIVE_TICK, Math.floor(Math.max(from, LIVE_TICK) / TICKS_PER_DAY) * TICKS_PER_DAY - LIVE_WARMUP);
@@ -240,7 +240,33 @@ function liveLayer(id: string, from: number, to: number): { add: Float64Array; j
     }
     if (n >= from) add[n - from] = y + j;
   }
-  return { add, jumps };
+  return { add, jumps, y, j };
+}
+
+function normCdf(x: number): number {
+  // Abramowitz-Stegun 7.1.26
+  const t = 1 / (1 + 0.3275911 * Math.abs(x) / Math.SQRT2);
+  const erf = 1 - (((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t) * Math.exp(-(x * x) / 2);
+  return x >= 0 ? (1 + erf) / 2 : (1 - erf) / 2;
+}
+
+/**
+ * Hissenin h tik sonra şimdikinden yüksek olma olasılığı (modelin bugünkü durumuna göre).
+ * Piyasa bahsinin oranları buradan gelir; böylece "çöküşten sonra yukarı" gibi bariz bahisler ucuzlamaz.
+ */
+export function upProbability(id: string, tick: number, h: number): number {
+  const risk = STOCK_BY_ID[id].risk;
+  const { y, j } = liveLayer(id, tick, tick);
+  const lp = LIVE_PARAMS[risk];
+  const live = tick >= LIVE_TICK;
+  const mean = live ? y * (Math.exp(-THETA_Y * h) - 1) + j * (Math.exp(-THETA_J * h) - 1) : 0;
+  const varY = live ? (lp.sigma ** 2 * (1 - Math.exp(-2 * THETA_Y * h))) / (2 * THETA_Y) : 0;
+  const baseSigma = RISK_PARAMS[risk].sigma * NEW.sigmaScale;
+  const varBase = baseSigma ** 2 * (h / PER_MIN);
+  const avgJump = (lp.jumpMin + lp.jumpMax) / 2;
+  const varJump = live ? lp.jumpP * h * avgJump ** 2 : 0;
+  const sd = Math.sqrt(varY + varBase + varJump);
+  return sd > 0 ? normCdf(mean / sd) : 0.5;
 }
 
 /** 20 saniyelik [from, to] tiklerindeki fiyatlar ve şoklar (her iki uç dahil). */

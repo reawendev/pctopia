@@ -189,6 +189,19 @@ export const EVENTS = {
     rep: 0, // ceza ayrıca uygulanır
     texts: ["Skandal: {company}, rakibi {target} şirketine karşı gizli operasyon yürütürken yakalandı.", "Piyasa Kulisi: {company} ile {target} arasında casusluk krizi. Deliller {company} şirketini gösteriyor."],
   },
+  gambling_loss: {
+    author: "gossip",
+    rep: 0, // itibar cezası ayrıca uygulanır
+    texts: [
+      "Magazin Ekspres gece kulübünde: {founder} ({company}) bir gecede {amount} kaybetti. Masadan kalkarken yüzü bembeyazdı.",
+      "Kumar masasında servet erittiler: {company} patronu {founder} için zor bir gece. Kayıp {amount}.",
+    ],
+  },
+  gambling_win: {
+    author: "gossip",
+    rep: 0,
+    texts: ["Şanslı gece: {founder} ({company}) kulüpte {amount} kazandı, bütün salona şampanya ısmarladı.", "{company} patronu {founder} masayı patlattı: tek gecede {amount}."],
+  },
   facility: {
     author: "news",
     rep: 2,
