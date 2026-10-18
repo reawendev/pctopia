@@ -9,7 +9,9 @@ import { EQUIPMENT } from "../game/config";
 import { formatMoney, incomePerHour, type Owned } from "../game/economy";
 import { stageFor } from "../game/stages";
 import { isMissingTable, logEvent } from "./company";
-import { postAbout } from "./social";
+import { postAbout, type EventId } from "./social";
+import { addEffect, type EffectKind } from "./effects";
+import { effectiveLevel } from "../game/facility";
 import { currentEvent } from "./events";
 import type { Perk } from "../game/life";
 import { db, HttpError } from "./supabase";
@@ -29,15 +31,33 @@ export type Choice = {
   winText: string;
   loseText: string;
   decline?: boolean; // "reddet": hiçbir şey olmaz
+  rep?: { win?: number; lose?: number }; // itibar değişimi
+  fx?: { win?: Fx; lose?: Fx }; // süreli etki
+  post?: { win?: EventId; lose?: EventId }; // sosyal medya haberi
+  risk?: number; // sekreter için: para dışı kayıpların para karşılığı (beklenen)
 };
 
-type Ctx = { H: number; bonus: number; client: string; partner: string | null };
+export type Fx = { kind: EffectKind; value: number; hours: number; label: string };
+
+/** Seçeneğin para dışı sonuçlarının kısa metni (istemci için). */
+function note(rep?: number, fx?: Fx): string {
+  const p: string[] = [];
+  if (fx) p.push(fx.label.replace(/^[^:]+:\s*/, ""));
+  if (rep) p.push(`itibar ${rep > 0 ? "+" : "−"}${Math.abs(rep)}`);
+  return p.join(", ");
+}
+
+type Ctx = { H: number; bonus: number; client: string; partner: string | null; model: string | null; accountant: boolean };
+
+/** Şirketin durumu: bazı krizler yalnızca uygun koşulda çıkar. */
+type Situation = { staff: number; accountant: boolean; facilityLevel: number; models: number; soldMax: number; netWorth: number };
 
 type Template = {
   id: string;
   weight: number;
   crisis?: boolean; // görmezden gelinirse 'ignore' seçeneği uygulanır
   needsPartner?: boolean;
+  when?: (s: Situation) => boolean;
   build: (c: Ctx) => { sender: string; subject: string; body: string; choices: Choice[] };
 };
 
@@ -183,6 +203,105 @@ const TEMPLATES: Template[] = [
       ],
     }),
   },
+
+  // ---- Şirkete özel krizler (Parti B) ----
+  {
+    id: "strike",
+    weight: 0.5,
+    crisis: true,
+    when: (s) => s.staff >= 2 || s.facilityLevel >= 3,
+    build: ({ H, bonus }) => ({
+      sender: "Çalışan Temsilcisi",
+      subject: "Grev uyarısı",
+      body: "Montaj ve depo çalışanları %20 zam istiyor. Talep karşılanmazsa yarın sabah iş bırakacaklarını söylüyorlar. Yanıtsız kalırsa grev başlar.",
+      choices: [
+        { id: "raise", label: `Zammı kabul et (${formatMoney(money(1.2 * H))})`, cost: money(1.2 * H), minutes: 0, p: 1, win: 0, lose: 0, winText: "Zam imzalandı, ekip işinin başında.", loseText: "", rep: { win: 1 } },
+        { id: "negotiate", label: "Pazarlık masasına otur", cost: 0, minutes: 20, p: prob(0.55 + bonus), win: -money(0.4 * H), lose: 0, winText: "Yarı yolda buluşuldu; küçük bir zamla anlaşıldı.", loseText: "Görüşmeler çıkmaza girdi, ekip iş bıraktı.", rep: { lose: -2 }, fx: { lose: { kind: "halt", value: 1, hours: 6, label: "Grev: üretim 6 saat durdu" } }, post: { lose: "strike" }, risk: 0.45 * (0.6 * H + 6 * 0.1 * H) },
+        { id: "ignore", label: "Görmezden gel", cost: 0, minutes: 0, p: 0.2, win: 0, lose: 0, winText: "Ekip son anda geri adım attı.", loseText: "Grev başladı, bantlar durdu.", rep: { lose: -3 }, fx: { lose: { kind: "halt", value: 1, hours: 10, label: "Grev: üretim 10 saat durdu" } }, post: { lose: "strike" }, risk: 0.8 * (0.9 * H + 10 * 0.1 * H) },
+      ],
+    }),
+  },
+  {
+    id: "recall",
+    weight: 0.5,
+    crisis: true,
+    when: (s) => s.soldMax >= 30,
+    build: ({ H, bonus, model }) => ({
+      sender: "Kalite Kontrol Birimi",
+      subject: `“${model}” modelinde arıza bildirimi`,
+      body: `Son partide satılan “${model}” cihazlarında güç kaynağı aşırı ısınıyor. Henüz yaralanan yok ama forumlarda şikâyetler artıyor. Yanıtsız kalırsa konu basına düşer.`,
+      choices: [
+        { id: "recall", label: `Gönüllü geri çağırma başlat (${formatMoney(money(1.5 * H))})`, cost: money(1.5 * H), minutes: 0, p: 1, win: 0, lose: 0, winText: "Geri çağırma takdir topladı; müşteriler şeffaflığı övdü.", loseText: "", rep: { win: 2 }, post: { win: "recall_good" } },
+        { id: "quiet", label: "Sessiz kal, tek tek değiştir", cost: 0, minutes: 30, p: prob(0.45 + bonus), win: -money(0.3 * H), lose: 0, winText: "Şikâyetler sessizce çözüldü.", loseText: "Haber yayıldı; müşteriler markadan uzaklaştı.", rep: { lose: -6 }, fx: { lose: { kind: "demand", value: -0.4, hours: 12, label: "Arıza skandalı: PC talebi 12 saat %40 düştü" } }, post: { lose: "recall_bad" }, risk: 0.55 * (1.8 * H + 12 * 0.4 * 0.3 * H) },
+        { id: "ignore", label: "Görmezden gel", cost: 0, minutes: 0, p: 0.35, win: 0, lose: 0, winText: "Şikâyetler kendiliğinden azaldı.", loseText: "Konu basına düştü; satışlar çakıldı.", rep: { lose: -6 }, fx: { lose: { kind: "demand", value: -0.4, hours: 12, label: "Arıza skandalı: PC talebi 12 saat %40 düştü" } }, post: { lose: "recall_bad" }, risk: 0.65 * (1.8 * H + 12 * 0.4 * 0.3 * H) },
+      ],
+    }),
+  },
+  {
+    id: "supply",
+    weight: 0.5,
+    crisis: true,
+    when: (s) => s.models >= 1,
+    build: ({ H, bonus }) => ({
+      sender: "Satın Alma Departmanı",
+      subject: "Ana tedarikçimiz teslimatı durdurdu",
+      body: "Parça tedarikçimizin limanda bekleyen konteynerleri gümrükte kaldı. Bu hafta yeni parça gelmeyecek. Karar vermezsen en pahalı yoldan alım yapılır.",
+      choices: [
+        { id: "pricey", label: "Pahalı tedarikçiden al", cost: 0, minutes: 0, p: 1, win: 0, lose: 0, winText: "Üretim sürüyor ama parçalar pahalıya geliyor.", loseText: "", fx: { win: { kind: "parts", value: 0.25, hours: 8, label: "Tedarik krizi: parça maliyeti 8 saat %25 arttı" } }, risk: 0.3 * H },
+        { id: "pause", label: "Üretimi durdur, stokla idare et", cost: 0, minutes: 0, p: 1, win: 0, lose: 0, winText: "Bantlar durdu; depodaki stok satılmaya devam ediyor.", loseText: "", fx: { win: { kind: "halt", value: 1, hours: 6, label: "Tedarik krizi: üretim 6 saat durdu" } }, risk: 0.4 * H },
+        { id: "grey", label: "Gri piyasadan parça bul", cost: 0, minutes: 20, p: prob(0.6 + bonus), win: 0, lose: -money(0.8 * H), winText: "Parçalar sorunsuz geldi, kimse fark etmedi.", loseText: "Faturasız parçalar denetimde yakalandı, ceza kesildi.", rep: { lose: -4 }, post: { lose: "grey_market" }, risk: 0.4 * 1.2 * H },
+        { id: "ignore", label: "Görmezden gel", cost: 0, minutes: 0, p: 1, win: 0, lose: 0, winText: "Satın alma en pahalı yoldan parça buldu.", loseText: "", fx: { win: { kind: "parts", value: 0.4, hours: 10, label: "Tedarik krizi: parça maliyeti 10 saat %40 arttı" } }, risk: 0.6 * H },
+      ],
+    }),
+  },
+  {
+    id: "audit",
+    weight: 0.5,
+    crisis: true,
+    when: (s) => s.netWorth >= 200_000,
+    build: ({ H, accountant }) => ({
+      sender: "Vergi Dairesi Müdürlüğü",
+      subject: "Vergi incelemesi bildirimi",
+      body: `Şirketinizin son dönem kayıtları incelemeye alınmıştır. Defter ve belgelerinizi hazır bulundurmanız rica olunur.${accountant ? " Muhasebecin kayıtların düzenli olduğunu söylüyor." : " Kayıtlar biraz karışık; muhasebecin olmadığı belli oluyor."}`,
+      choices: [
+        { id: "open", label: "Defterleri aç", cost: 0, minutes: 30, p: accountant ? 0.92 : 0.55, win: 0, lose: -money(2.5 * H), winText: "İnceleme temiz çıktı.", loseText: "Eksik belgeler nedeniyle vergi cezası kesildi.", rep: { lose: -3 }, post: { lose: "tax_fine" } },
+        { id: "advisor", label: `Mali müşavir tut (${formatMoney(money(0.8 * H))})`, cost: money(0.8 * H), minutes: 30, p: 0.9, win: 0, lose: -money(1.5 * H), winText: "Müşavir dosyayı toparladı, inceleme sorunsuz kapandı.", loseText: "Müşavire rağmen bir eksik bulundu, ceza kesildi.", rep: { lose: -2 }, post: { lose: "tax_fine" } },
+        { id: "ignore", label: "Görmezden gel", cost: 0, minutes: 0, p: 0, win: 0, lose: -money(4 * H), winText: "", loseText: "Bildirime yanıt verilmediği için en ağır ceza kesildi.", rep: { lose: -5 }, post: { lose: "tax_fine" } },
+      ],
+    }),
+  },
+  {
+    id: "fire",
+    weight: 0.4,
+    crisis: true,
+    when: (s) => s.facilityLevel >= 2,
+    build: ({ H }) => ({
+      sender: "Tesis Müdürü",
+      subject: "Depoda yangın çıktı",
+      body: "Gece depodaki şarj istasyonunda kısa devre yangına yol açtı. İtfaiye müdahale etti, yaralanan yok ama montaj alanı kullanılamıyor.",
+      choices: [
+        { id: "repair", label: `Hemen onart (${formatMoney(money(1.5 * H))})`, cost: money(1.5 * H), minutes: 0, p: 1, win: 0, lose: 0, winText: "Onarım ekibi sabaha kadar çalıştı.", loseText: "", fx: { win: { kind: "halt", value: 1, hours: 2, label: "Yangın onarımı: üretim 2 saat durdu" } }, risk: 0.2 * H },
+        { id: "insurance", label: "Sigortaya bildir, ekspertizi bekle", cost: 0, minutes: 30, p: 0.65, win: money(0.3 * H), lose: -money(1 * H), winText: "Sigorta hasarı karşıladı, üstüne kira kaybı da ödendi.", loseText: "Sigorta kapsam dışı dedi; onarım sana kaldı.", fx: { win: { kind: "halt", value: 1, hours: 6, label: "Ekspertiz: üretim 6 saat durdu" }, lose: { kind: "halt", value: 1, hours: 8, label: "Ekspertiz ve onarım: üretim 8 saat durdu" } }, risk: 0.7 * H },
+        { id: "ignore", label: "Görmezden gel", cost: 0, minutes: 0, p: 0, win: 0, lose: -money(1 * H), winText: "", loseText: "Kimse ilgilenmeyince hasar büyüdü.", fx: { lose: { kind: "halt", value: 1, hours: 24, label: "Yangın hasarı: üretim 24 saat durdu" } }, risk: 2.4 * H },
+      ],
+    }),
+  },
+  {
+    id: "leak",
+    weight: 0.4,
+    crisis: true,
+    when: (s) => s.netWorth >= 50_000,
+    build: ({ H, bonus }) => ({
+      sender: "Bilgi Güvenliği Sorumlusu",
+      subject: "Müşteri verileri sızdırıldı",
+      body: "Servis kayıt sistemimizden müşteri adları ve telefonları bir forumda paylaşılmış. Henüz kimse fark etmedi ama er geç ortaya çıkacak.",
+      choices: [
+        { id: "disclose", label: `Kamuoyuna açıkla, müşterileri bilgilendir (${formatMoney(money(0.5 * H))})`, cost: money(0.5 * H), minutes: 0, p: 1, win: 0, lose: 0, winText: "Açıklama sert eleştiri aldı ama dürüstlük takdir edildi.", loseText: "", rep: { win: -1 }, post: { win: "leak_open" } },
+        { id: "cover", label: "Örtbas et", cost: 0, minutes: 30, p: prob(0.55 + bonus), win: 0, lose: 0, winText: "Paylaşım kaldırıldı, konu kapandı.", loseText: "Örtbas girişimi ortaya çıktı; tepki çığ gibi büyüdü.", rep: { lose: -8 }, fx: { lose: { kind: "demand", value: -0.25, hours: 12, label: "Veri skandalı: PC talebi 12 saat %25 düştü" } }, post: { lose: "leak_cover" }, risk: 0.45 * (2.4 * H + 12 * 0.25 * 0.3 * H) },
+        { id: "ignore", label: "Görmezden gel", cost: 0, minutes: 0, p: 0.3, win: 0, lose: 0, winText: "Paylaşım gözden kaçtı.", loseText: "Sızıntı haber oldu.", rep: { lose: -6 }, post: { lose: "leak_cover" }, risk: 0.7 * 1.8 * H },
+      ],
+    }),
+  },
 ];
 
 const TEMPLATE_BY_ID = Object.fromEntries(TEMPLATES.map((t) => [t.id, t]));
@@ -227,6 +346,23 @@ export type OfferRow = {
   read_at: string | null;
 };
 
+/** Para dışı sonuçlar: itibar, süreli etki, haber. */
+async function applyExtras(companyId: string, companyName: string, c: Choice, success: boolean, press: number) {
+  const rep = success ? c.rep?.win : c.rep?.lose;
+  const fx = success ? c.fx?.win : c.fx?.lose;
+  const post = success ? c.post?.win : c.post?.lose;
+  if (fx) {
+    await addEffect(companyId, fx.kind, fx.value, fx.hours, fx.label);
+    await logEvent(companyId, "crisis", fx.label + ".");
+  }
+  if (rep) await db().rpc("adjust_reputation", { p_company: companyId, p_delta: rep });
+  if (post) await postAbout(companyId, post, { company: companyName }, press);
+  if (fx?.kind === "demand") {
+    const { invalidateMarket } = await import("./workshop");
+    invalidateMarket();
+  }
+}
+
 /** Seçeneği sonuçlandırır (zar atar) ve nakdi atomik olarak değiştirir. */
 async function settle(o: OfferRow, choice: Choice, status: "done" | "expired", companyName: string, press = 0): Promise<boolean> {
   const success = Math.random() < choice.p;
@@ -239,6 +375,7 @@ async function settle(o: OfferRow, choice: Choice, status: "done" | "expired", c
     const sign = amount > 0 ? `+\u2060${formatMoney(amount)}` : amount < 0 ? `−\u2060${formatMoney(-amount)}` : "";
     await logEvent(o.company_id, "offer", `${o.subject}: ${text}${sign ? ` (${sign})` : ""}`, amount);
     if (o.template === "ransomware" && amount < 0) await postAbout(o.company_id, "ransomware", { company: companyName }, press);
+    await applyExtras(o.company_id, companyName, choice, success, press);
     if (o.template === "tender" && success) await postAbout(o.company_id, "tender_won", { company: companyName }, press);
   }
   return !!ok;
@@ -305,17 +442,30 @@ export async function syncOffers(
     // Konsorsiyum senaryosu için gerçek bir rakip şirket adı
     const { data: others } = await db().from("companies").select("name").neq("id", company.id).limit(50);
     const names = (others ?? []).map((r) => r.name as string);
+    // Krizlerin koşulları için şirketin durumu
+    const { data: ms } = await db().from("pc_models").select("name, sold_total").eq("company_id", company.id);
+    const top = (ms ?? []).slice().sort((a, b) => b.sold_total - a.sold_total)[0];
+    const c = company as any;
+    const staff: string[] = c._staff ?? [];
+    const sit: Situation = {
+      staff: staff.length,
+      accountant: staff.includes("muhasebeci"),
+      facilityLevel: effectiveLevel(c.facility_level, c.facility_target, c.facility_ready_at),
+      models: (ms ?? []).length,
+      soldMax: top?.sold_total ?? 0,
+      netWorth,
+    };
     const H = offerUnit(owned);
     const bonus = Math.min(0.25, successBonus(owned, netWorth) + perks.offer);
     const rows = [];
     const ev = currentEvent().effects;
     for (let i = 0; i < toCreate; i++) {
       // Dünya olayı: siber saldırı dalgasında krizler daha sık
-      const pool = TEMPLATES.filter((t) => !t.needsPartner || names.length > 0).map((t) => ({ ...t, weight: t.crisis ? t.weight * (ev.crisisWeight ?? 1) : t.weight }));
+      const pool = TEMPLATES.filter((t) => (!t.needsPartner || names.length > 0) && (!t.when || t.when(sit))).map((t) => ({ ...t, weight: t.crisis ? t.weight * (ev.crisisWeight ?? 1) : t.weight }));
       const tpl = pickWeighted(pool);
       const client = CLIENTS[Math.floor(Math.random() * CLIENTS.length)];
       const partner = names.length ? names[Math.floor(Math.random() * names.length)] : null;
-      const built = tpl.build({ H, bonus, client, partner });
+      const built = tpl.build({ H, bonus, client, partner, model: top?.name ?? null, accountant: sit.accountant });
       // Dünya olayı: teklif ödülleri çarpanı (yalnızca kazançlar)
       if (ev.offerReward && ev.offerReward !== 1) {
         built.choices = built.choices.map((c) => ({ ...c, win: c.win > 0 ? money(c.win * ev.offerReward!) : c.win }));
@@ -349,7 +499,7 @@ const SECRETARY_LEAD_MIN = 10;
 /** Sekreterin seçimi: beklenen değeri en yüksek seçenek; zararlıysa reddet (krizde en az zararlısı). */
 export function secretaryChoice(o: OfferRow, cash: number, crisis: boolean): Choice {
   const options = o.choices.filter((c) => !c.decline && c.cost <= cash);
-  const ev = (c: Choice) => c.p * c.win + (1 - c.p) * c.lose - c.cost;
+  const ev = (c: Choice) => c.p * c.win + (1 - c.p) * c.lose - c.cost - (c.risk ?? 0);
   const best = options.sort((a, b) => ev(b) - ev(a))[0];
   const decline = o.choices.find((c) => c.decline);
   if (!best) return decline ?? o.choices[0];
@@ -402,7 +552,18 @@ export function offerView(o: OfferRow) {
     subject: o.subject,
     body: o.body,
     status: o.status,
-    choices: o.choices.map((c) => ({ id: c.id, label: c.label, cost: c.cost, minutes: c.minutes, p: c.p, win: c.win, lose: c.lose, decline: !!c.decline })),
+    choices: o.choices.map((c) => ({
+      id: c.id,
+      label: c.label,
+      cost: c.cost,
+      minutes: c.minutes,
+      p: c.p,
+      win: c.win,
+      lose: c.lose,
+      decline: !!c.decline,
+      winNote: note(c.rep?.win, c.fx?.win),
+      loseNote: note(c.rep?.lose, c.fx?.lose),
+    })),
     chosen: chosen ? { id: chosen.id, label: chosen.label } : null,
     resolvesAt: o.resolves_at,
     resultText: o.result_text,

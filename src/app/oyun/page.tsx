@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Appearance } from "@/components/Appearance";
+import { Facility } from "@/components/Facility";
 import { Feed } from "@/components/Feed";
 import { Finance } from "@/components/Finance";
 import { Properties } from "@/components/Properties";
@@ -314,6 +315,8 @@ export default function Oyun() {
                 )}
                 <p className="mt-2 font-serif text-[15px] italic text-white/80">{career.stage.scene}</p>
               </section>
+
+              <Facility cash={company.cash} now={serverNow} onState={apply} notify={setToast} />
 
               <Appearance character={company.character} logo={company.logo} portraitUrl={company.portraitUrl} logoUrl={company.logoUrl} onState={apply} notify={setToast} />
 

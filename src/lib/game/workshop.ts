@@ -120,7 +120,7 @@ export function priceFactor(price: number, fair: number): number {
 export const OUTSIDE_APPEAL = 1;
 
 export function appeal(price: number, fair: number, reputation: number, demandBonus = 0): number {
-  return priceFactor(price, fair) * (0.6 + Math.max(0, Math.min(100, reputation)) / 125) * (1 + demandBonus);
+  return priceFactor(price, fair) * (0.6 + Math.max(0, Math.min(100, reputation)) / 125) * Math.max(0, 1 + demandBonus);
 }
 
 export function segmentDemand(seg: SegmentId, sellers: number, eventMult = 1): number {

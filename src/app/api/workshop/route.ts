@@ -1,5 +1,6 @@
 import { formatMoney } from "@/lib/game/economy";
-import { fairValue, isValidParts, MAX_LIST_RATIO, MAX_MODELS, MAX_STOCK, unitCost } from "@/lib/game/workshop";
+import { fairValue, isValidParts, MAX_LIST_RATIO, unitCost } from "@/lib/game/workshop";
+import { effectsView } from "@/lib/server/effects";
 import { loadCompany, loadJournal, logEvent, view } from "@/lib/server/company";
 import { gameContext } from "@/lib/server/context";
 import { db, handle, HttpError, requireUser } from "@/lib/server/supabase";
@@ -23,6 +24,9 @@ async function listing(userId: string, extra: Record<string, unknown> = {}) {
     companyId: g.company.id,
     reputation: g.reputation,
     perks: g.perks,
+    limits: { maxModels: g.facility.maxModels, maxStock: g.facility.maxStock, batch: g.facility.batch, facility: g.facility.name },
+    halt: g.effects.halt ? { label: g.effects.halt.label, until: g.effects.halt.expires_at } : null,
+    effects: effectsView(g.effects),
     ...(await workshopView(g.ctx, models)),
     ...extra,
   };
@@ -72,7 +76,8 @@ async function apply(userId: string, g: Awaited<ReturnType<typeof gameContext>>,
 
   switch (action) {
     case "create": {
-      if (models.length >= MAX_MODELS) throw new HttpError(400, `En fazla ${MAX_MODELS} model tasarlayabilirsin`);
+      const maxModels = g.facility.maxModels;
+      if (models.length >= maxModels) throw new HttpError(400, `${g.facility.name} en fazla ${maxModels} model alır. Daha fazlası için tesisini büyüt.`);
       const name = String(body.name ?? "").trim().replace(/\s+/g, " ");
       if (name.length < 2 || name.length > 30) throw new HttpError(400, "Model adı 2-30 karakter olmalı");
       if (models.some((m) => m.name.toLocaleLowerCase("tr") === name.toLocaleLowerCase("tr"))) throw new HttpError(409, "Bu isimde bir modelin zaten var");
@@ -88,13 +93,15 @@ async function apply(userId: string, g: Awaited<ReturnType<typeof gameContext>>,
     case "produce": {
       const m = find();
       const qty = Math.trunc(Number(body.qty));
-      if (!Number.isFinite(qty) || qty < 1 || qty > 100) throw new HttpError(400, "Tek seferde 1-100 adet üretebilirsin");
-      if (m.stock + qty > MAX_STOCK) throw new HttpError(400, `Depo en fazla ${MAX_STOCK} adet alır`);
+      const { batch, maxStock } = g.facility;
+      if (g.effects.halt) throw new HttpError(409, `Üretim durdu: ${g.effects.halt.label}`);
+      if (!Number.isFinite(qty) || qty < 1 || qty > batch) throw new HttpError(400, `Tek seferde 1-${batch} adet üretebilirsin`);
+      if (m.stock + qty > maxStock) throw new HttpError(400, `Depo en fazla ${maxStock} adet alır`);
       const cost = unitCost(m.parts, g.perks.parts, mult()) * qty;
       const { error } = await db().rpc("produce_pc", { p_company: g.company.id, p_model: m.id, p_qty: qty, p_cost: cost });
       if (error) {
         if (/Yetersiz nakit/.test(error.message)) throw new HttpError(400, `Bu üretim için kasada ${formatMoney(cost)} olmalı`);
-        if (/Stok/.test(error.message)) throw new HttpError(400, `Depo en fazla ${MAX_STOCK} adet alır`);
+        if (/Stok/.test(error.message)) throw new HttpError(400, `Depo en fazla ${maxStock} adet alır`);
         throw new HttpError(500, error.message);
       }
       // Stok sıfırdan geldiyse satış saati şimdiden başlar (boş depoda biriken talep olmaz)

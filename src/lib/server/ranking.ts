@@ -1,6 +1,6 @@
 // Sektör sıralaması: lider tablosu, şampiyonlar ve profil sayfası aynı hesabı kullanır.
 
-import { companyNetWorth, loadAllAssets } from "./company";
+import { companyNetWorth, facilityWorth, loadAllAssets } from "./company";
 import { snapshot } from "./market";
 import { db, HttpError } from "./supabase";
 
@@ -42,7 +42,7 @@ export async function rankCompanies(): Promise<Ranked[]> {
         character: c.character,
         createdAt: c.created_at,
         reputation: (c.reputation as number | undefined) ?? 50,
-        netWorth: companyNetWorth(c.cash, a.owned, a.holdings, prices, (a as any).extra ?? 0),
+        netWorth: companyNetWorth(c.cash, a.owned, a.holdings, prices, ((a as any).extra ?? 0) + facilityWorth(c)),
       };
     })
     .sort((a, b) => b.netWorth - a.netWorth)

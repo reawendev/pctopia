@@ -6,6 +6,7 @@ import { syncSales } from "@/lib/server/workshop";
 import { syncFinance } from "@/lib/server/finance";
 import { syncResearch } from "@/lib/server/research";
 import { syncTenders } from "@/lib/server/tenders";
+import { syncFacility } from "@/lib/server/facility";
 import { db, handle, HttpError, requireUser } from "@/lib/server/supabase";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +22,8 @@ export const GET = handle(async (req) => {
   const sold = await syncSales(g.ctx);
   const fin = await syncFinance(user.id);
   const rnd = await syncResearch(g.company.id, g.company.name);
-  if (sold || fin || tenders || rnd) state = (await loadCompany(user.id))!;
+  const fac = await syncFacility(g.company);
+  if (sold || fin || tenders || rnd || fac) state = (await loadCompany(user.id))!;
   const journal = await loadJournal(state.company.id);
   return { hasCompany: true, isAdmin: user.isAdmin, journal, ...view(state.company, state.owned, state.holdings) };
 });

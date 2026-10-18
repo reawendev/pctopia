@@ -4,6 +4,7 @@ import { assetValue, incomePerHour, pendingIncome, type Owned } from "../game/ec
 import { portfolioValue, type Holdings } from "../game/market";
 import { ACCOUNTANT_CAP_HOURS, depositValue, loanOwed, RESALE, type Role } from "../game/finance";
 import { OFFLINE_CAP_HOURS } from "../game/config";
+import { FACILITY_RESALE, facilityInvested } from "../game/facility";
 
 export type CompanyRow = {
   id: string;
@@ -26,7 +27,16 @@ export type CompanyRow = {
   _cap?: number;
   /** loadCompany tarafından eklenir: işe alınmış çalışanlar */
   _staff?: Role[];
+  facility_level?: number;
+  facility_target?: number | null;
+  facility_ready_at?: string | null;
 };
+
+/** Tesise yapılan yatırımın net değere katkısı (inşaatı süren seviye dahil: bedeli ödendi). */
+export function facilityWorth(c: { facility_level?: number | null; facility_target?: number | null }): number {
+  const lvl = Math.max(c.facility_level ?? 1, c.facility_target ?? 0);
+  return Math.floor(facilityInvested(lvl) * FACILITY_RESALE);
+}
 
 type BankRow = { company_id: string; deposit: number; deposit_at: string; loan_principal: number; loan_rate: number; loan_taken_at: string | null; loan_due_at: string | null; banned_until: string | null };
 
@@ -83,7 +93,7 @@ export async function loadCompany(
     optional<{ role: Role }>(db().from("employees").select("role").eq("company_id", company.id)),
   ]);
   const row = company as CompanyRow;
-  row._extra = extraWorth(bank[0], status.map((s) => s.price));
+  row._extra = extraWorth(bank[0], status.map((s) => s.price)) + facilityWorth(row);
   row._staff = staff.map((s) => s.role);
   row._cap = row._staff.includes("muhasebeci") ? ACCOUNTANT_CAP_HOURS : OFFLINE_CAP_HOURS;
   return { company: row, owned, holdings };

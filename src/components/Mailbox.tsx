@@ -8,7 +8,7 @@ import { formatMoney } from "@/lib/game/economy";
 import { apiFetch } from "@/lib/supabase/client";
 import { ago } from "@/lib/time";
 
-export type OfferChoice = { id: string; label: string; cost: number; minutes: number; p: number; win: number; lose: number; decline: boolean };
+export type OfferChoice = { id: string; label: string; cost: number; minutes: number; p: number; win: number; lose: number; decline: boolean; winNote?: string; loseNote?: string };
 export type Offer = {
   id: string;
   template: string;
@@ -338,12 +338,18 @@ function OfferPane({ o, now, cash, busy, onChoose }: { o: Offer; now: number; ca
                       )}
                       <div>
                         <dt className="inline">{c.p >= 1 ? "Sonuç " : "Başarırsa "}</dt>
-                        <dd className={`inline ${c.win - c.cost >= 0 ? "text-gain" : "text-loss"}`}>{signed(c.win - c.cost)}</dd>
+                        <dd className={`inline ${c.win - c.cost >= 0 ? "text-gain" : "text-loss"}`}>
+                          {c.win - c.cost !== 0 || !c.winNote ? signed(c.win - c.cost) : ""}
+                          {c.winNote && <span className="text-amber">{c.win - c.cost !== 0 ? ", " : ""}{c.winNote}</span>}
+                        </dd>
                       </div>
                       {c.p < 1 && (
                         <div>
                           <dt className="inline">Olmazsa </dt>
-                          <dd className={`inline ${c.lose - c.cost >= 0 ? "text-mute" : "text-loss"}`}>{signed(c.lose - c.cost)}</dd>
+                          <dd className={`inline ${c.lose - c.cost >= 0 ? "text-mute" : "text-loss"}`}>
+                            {c.lose - c.cost !== 0 || !c.loseNote ? signed(c.lose - c.cost) : ""}
+                            {c.loseNote && <span className="text-loss">{c.lose - c.cost !== 0 ? ", " : ""}{c.loseNote}</span>}
+                          </dd>
                         </div>
                       )}
                     </dl>

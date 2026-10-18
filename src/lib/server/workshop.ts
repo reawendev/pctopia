@@ -13,6 +13,7 @@ import { postAbout } from "./social";
 import { payShares } from "./finance";
 import { SALES_MANAGER_BONUS } from "../game/finance";
 import { techPerks } from "./research";
+import { loadEffects } from "./effects";
 import { db, HttpError } from "./supabase";
 
 export type ModelRow = {
@@ -78,7 +79,7 @@ export async function loadMarket(force = false): Promise<MarketListing[]> {
   const demand = new Map<string, number>();
   const premium = new Map<string, number>();
   if (ids.length) {
-    const tech = await techPerks(ids);
+    const [tech, fx] = await Promise.all([techPerks(ids), loadEffects(ids)]);
     for (const [id, t] of tech) premium.set(id, t.premium);
     const [{ data: cos }, { data: rels }, { data: managers }] = await Promise.all([
       db().from("companies").select("*").in("id", ids),
@@ -98,7 +99,7 @@ export async function loadMarket(force = false): Promise<MarketListing[]> {
           married: r.married,
         }))
       );
-      demand.set(id, perks.demand + (hasManager.has(id) ? SALES_MANAGER_BONUS : 0) + (tech.get(id)?.demand ?? 0));
+      demand.set(id, perks.demand + (hasManager.has(id) ? SALES_MANAGER_BONUS : 0) + (tech.get(id)?.demand ?? 0) + (fx.get(id)?.demand ?? 0));
     }
   }
   const mult = partMultipliers(currentEvent().effects);

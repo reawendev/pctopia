@@ -1,4 +1,4 @@
-import { companyNetWorth, loadAllAssets } from "@/lib/server/company";
+import { companyNetWorth, facilityWorth, loadAllAssets } from "@/lib/server/company";
 import { snapshot } from "@/lib/server/market";
 import { db, handle, HttpError, requireAdmin } from "@/lib/server/supabase";
 
@@ -11,7 +11,7 @@ export const GET = handle(async (req) => {
   const [users, profiles, companies, eq] = await Promise.all([
     db().auth.admin.listUsers({ page: 1, perPage: 500 }),
     db().from("profiles").select("id, is_admin, banned, created_at"),
-    db().from("companies").select("id, owner_id, name, founder_name, cash, created_at"),
+    db().from("companies").select("*"),
     loadAllAssets(),
   ]);
   if (users.error) throw new HttpError(500, users.error.message);
@@ -38,7 +38,7 @@ export const GET = handle(async (req) => {
             name: c.name,
             founderName: c.founder_name,
             cash: Number(c.cash),
-            netWorth: companyNetWorth(c.cash, eq.get(c.id)?.owned ?? {}, eq.get(c.id)?.holdings ?? {}, prices, eq.get(c.id)?.extra ?? 0),
+            netWorth: companyNetWorth(c.cash, eq.get(c.id)?.owned ?? {}, eq.get(c.id)?.holdings ?? {}, prices, (eq.get(c.id)?.extra ?? 0) + facilityWorth(c)),
           }
         : null,
     };

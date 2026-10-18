@@ -5,6 +5,8 @@ import { stageFor } from "../game/stages";
 import { companyNetWorth, loadCompany, type CompanyRow } from "./company";
 import { companyPerks } from "./life";
 import { techPerks } from "./research";
+import { loadEffects, type EffectSum } from "./effects";
+import { effectiveLevel, facility, type Facility } from "../game/facility";
 import { HttpError } from "./supabase";
 import { SALES_MANAGER_BONUS } from "../game/finance";
 import type { Owned } from "../game/economy";
@@ -18,6 +20,8 @@ export type GameContext = {
   stageLevel: number;
   reputation: number;
   perks: Record<Perk, number>;
+  facility: Facility;
+  effects: EffectSum;
   /** atölye/sosyal fonksiyonlarının beklediği kısa biçim */
   ctx: { id: string; name: string; reputation: number; stageLevel: number; perks: Record<Perk, number> };
 };
@@ -37,6 +41,13 @@ export async function gameContext(userId: string): Promise<GameContext> {
   perks.parts += tech.parts;
   perks.demand += tech.demand;
   perks.premium += tech.premium;
+  // Tesis: ölçek ekonomisi
+  const fac = facility(effectiveLevel(company.facility_level, company.facility_target, company.facility_ready_at));
+  perks.parts += fac.scale;
+  // Süren krizler: talep ve maliyet
+  const effects = (await loadEffects([company.id])).get(company.id)!;
+  perks.demand += effects.demand;
+  perks.parts -= effects.parts;
   return {
     company,
     owned,
@@ -45,6 +56,8 @@ export async function gameContext(userId: string): Promise<GameContext> {
     stageLevel,
     reputation,
     perks,
+    facility: fac,
+    effects,
     ctx: { id: company.id, name: company.name, reputation, stageLevel, perks },
   };
 }

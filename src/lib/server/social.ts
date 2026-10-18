@@ -133,6 +133,47 @@ export const EVENTS = {
       "Skandal: {company} verdiği teklifin arkasında duramadı. {buyer} ihalesi el değiştirdi.",
     ],
   },
+  // Krizler: itibar etkisi seçeneğin kendisinde uygulanır, haberin kendisi 0
+  strike: {
+    author: "business",
+    rep: 0,
+    texts: ["{company} çalışanları iş bıraktı. Montaj bantları durdu.", "Kulis: {company} ile çalışanları arasında zam krizi grevle sonuçlandı."],
+  },
+  recall_good: {
+    author: "reviewer",
+    rep: 0,
+    texts: ["{company} arızalı partiyi kendiliğinden geri çağırdı. Böyle şeffaflık az görülür.", "Takdir: {company} güvenlik sorunu için hızlı geri çağırma başlattı."],
+  },
+  recall_bad: {
+    author: "watchdog",
+    rep: 0,
+    texts: ["Kullanıcılar uyarıyor: {company} bilgisayarlarında güç kaynağı aşırı ısınıyor, şirket sessiz.", "{company} arızayı biliyordu ama sustu. Forumlar ayakta."],
+  },
+  grey_market: {
+    author: "watchdog",
+    rep: 0,
+    texts: ["{company} faturasız parça kullanırken yakalandı. Denetim ceza kesti.", "Gri piyasa operasyonu: {company} depolarında kayıt dışı parça bulundu."],
+  },
+  tax_fine: {
+    author: "business",
+    rep: 0,
+    texts: ["Vergi incelemesi sonuçlandı: {company} için ağır ceza.", "Piyasa Kulisi: {company} defterlerindeki eksikler pahalıya patladı."],
+  },
+  leak_open: {
+    author: "news",
+    rep: 0,
+    texts: ["{company} müşteri verilerinin sızdığını açıkladı ve tüm müşterilerini bilgilendirdi.", "Veri sızıntısı: {company} sorumluluğu üstlendi."],
+  },
+  leak_cover: {
+    author: "watchdog",
+    rep: 0,
+    texts: ["{company} müşteri verilerinin sızdığını gizledi. Şirketten açıklama yok.", "Skandal: {company} veri sızıntısını örtbas etmeye çalıştı."],
+  },
+  facility: {
+    author: "news",
+    rep: 2,
+    texts: ["{company} büyüyor: şirket yeni {facility} tesisine taşındı.", "Yeni adres: {company}, {facility} açılışını yaptı."],
+  },
   patent: {
     author: "news",
     rep: 2,

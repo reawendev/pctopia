@@ -4,6 +4,7 @@ import { syncSales } from "@/lib/server/workshop";
 import { syncFinance } from "@/lib/server/finance";
 import { syncResearch } from "@/lib/server/research";
 import { syncTenders } from "@/lib/server/tenders";
+import { syncFacility } from "@/lib/server/facility";
 import { offerView, syncOffers, type OfferRow } from "@/lib/server/offers";
 import { db, handle, HttpError, requireUser } from "@/lib/server/supabase";
 
@@ -20,7 +21,10 @@ export const GET = handle(async (req) => {
 
   // Sayfa açıkken 30 sn'de bir çağrılır: PC satışlarını ve teklifleri birlikte günceller
   const salesChanged = await syncSales(g.ctx);
-  const financeChanged = (await syncFinance(user.id)) || tendersChanged || (await syncResearch(company.id, company.name));
+  const fin = await syncFinance(user.id);
+  const rnd = await syncResearch(company.id, company.name);
+  const fac = await syncFacility(company);
+  const financeChanged = fin || tendersChanged || rnd || fac;
   const { changed: offersChanged, ready } = await syncOffers(company, owned, g.netWorth, g.perks);
   const changed = salesChanged || offersChanged || financeChanged;
   if (!ready) {

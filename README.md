@@ -16,6 +16,7 @@
    - `supabase/migrations/007_finans.sql`
    - `supabase/migrations/008_sosyal_profil.sql`
    - `supabase/migrations/009_ihale_arge.sql`
+   - `supabase/migrations/010_tesis_kriz.sql`
 
    Mevcut bir veritabanını güncelliyorsan yalnızca henüz çalıştırmadığın `migrations/` dosyalarını çalıştır.
 2. `.env.example` dosyasını `.env.local` olarak kopyala, Supabase anahtarlarını gir.
@@ -76,6 +77,16 @@ Vercel'e bağla, ortam değişkenlerini ekle: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_
 
 - `src/lib/game/research.ts`: 6 proje (montaj hattı, tedarikçi anlaşmaları, sessiz soğutma, endüstriyel tasarım, yapay zekâ hızlandırıcı, yeni nesil grafik mimarisi). Etkiler: parça maliyeti indirimi, hak edilen fiyat (`fairValue` premium) ve pazarda çekicilik.
 - Aynı anda tek proje, bedel peşin. Patentli iki projeyi ilk bitiren 24 saat tek başına kullanır; patent süresinde bitirenler patent bitince yararlanır. Hesap tamamen kayıtlardan yapılır, zamanlayıcı gerekmez.
+
+## Tesis
+
+- `src/lib/game/facility.ts`: garajdan teknoloji kampüsüne 6 seviye. Her seviye model sayısını, model başına depoyu ve tek seferde üretimi artırır; 3. seviyeden itibaren ölçek ekonomisi (üretim maliyeti −%3 … −%12). İnşaat 1–24 saat sürer, bedel peşin, her açılışta itibar +2 ve haber.
+- Sınırlar veritabanında da uygulanır (`facility_max_stock`, `facility_max_models`; `produce_pc` ve toptan satış bunları kullanır). Yatırımın yarısı net değere sayılır.
+
+## Kriz senaryoları
+
+- Teklif havuzunda şirketin durumuna göre çıkan krizler (`src/lib/server/offers.ts`): grev (çalışanı ya da büyük tesisi olana), arızalı parti / geri çağırma (bir modelinden 30+ satan), tedarik krizi, vergi incelemesi (muhasebecisi olan daha rahat geçer), depo yangını, müşteri verisi sızıntısı. Yanıtsız kalan kriz kendi "görmezden gel" sonucuyla kapanır.
+- Seçenekler para dışında itibar, sosyal medya haberi ve süreli etki doğurabilir. Süreli etkiler `company_effects` tablosunda tutulur: `halt` (üretim durur), `demand` (PC çekiciliği; −1 satışı durdurur), `parts` (parça maliyeti artar). Ofis'te "Süren krizler" kartında görünür.
 
 ## Dünya olayları
 
@@ -160,6 +171,7 @@ Next.js 14, yalnızca GET içeren route'lardaki `fetch` isteklerini kalıcı ola
 - [x] Şirket profili, görsel yükleme, oyuncu paylaşımları
 - [x] Borsa: otomotiv, savunma, denizcilik, havacılık, enerji, yarı iletken, lojistik, telekom hisseleri
 - [x] İhaleler ve Ar-Ge
+- [x] Tesis büyütme ve şirkete özel krizler
 - [ ] Ar-Ge
 - [ ] Mobil sürüm (Capacitor ile Android/iOS)
 - [ ] Oyuncular arası etkileşim (ihale, satın alma teklifi)

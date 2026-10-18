@@ -7,7 +7,7 @@ import type { LogoSpec } from "@/lib/game/config";
 import { formatMoney } from "@/lib/game/economy";
 import type { Perk } from "@/lib/game/life";
 import {
-  appeal, estimateRate, fairValue, isBottlenecked, MAX_LIST_RATIO, MAX_MODELS, PARTS, performanceScore, QUALITIES, QUALITY_LABEL,
+  appeal, estimateRate, fairValue, isBottlenecked, MAX_LIST_RATIO, PARTS, performanceScore, QUALITIES, QUALITY_LABEL,
   SEGMENT_IDS, SEGMENTS, segmentId, SLOT_LABEL, SLOTS, unitCost, verdict, type Listing, type PartMult, type Parts, type PriceVerdict,
 } from "@/lib/game/workshop";
 import { apiFetch } from "@/lib/supabase/client";
@@ -41,6 +41,9 @@ type WorkshopData = {
   market: BoardRow[];
   mine: Listing[];
   event: { id: string; demand: EventEffects["demand"]; parts: PartMult };
+  limits?: { maxModels: number; maxStock: number; batch: number; facility: string };
+  halt?: { label: string; until: string } | null;
+  effects?: { kind: string; value: number; label: string; expiresAt: string }[];
   message?: string;
   journal?: unknown;
   state?: unknown;
@@ -130,16 +133,26 @@ export function Workshop({ cash, onState, notify }: { cash: number; stageLevel?:
     eventDemand: data.event.demand,
   };
 
+  const limits = data.limits ?? { maxModels: 5, maxStock: 500, batch: 100, facility: "Garaj atölyesi" };
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-mute">
           Tüm oyuncular aynı müşterileri paylaşır. Payın; fiyatının hak ettiği değere oranına, itibarına ve rakiplere bağlı.
         </p>
-        <button className="btn btn-primary !py-2" disabled={data.models.length >= MAX_MODELS} onClick={() => setDesigning((v) => !v)}>
-          {designing ? "Tasarımı kapat" : data.models.length >= MAX_MODELS ? `En fazla ${MAX_MODELS} model` : "Yeni model tasarla"}
+        <button className="btn btn-primary !py-2" disabled={data.models.length >= limits.maxModels} onClick={() => setDesigning((v) => !v)}>
+          {designing ? "Tasarımı kapat" : data.models.length >= limits.maxModels ? `En fazla ${limits.maxModels} model` : "Yeni model tasarla"}
         </button>
       </div>
+      <p className="text-xs text-mute">
+        {limits.facility}: en fazla {limits.maxModels} model, model başına {limits.maxStock.toLocaleString("tr-TR")} adet depo, tek seferde {limits.batch.toLocaleString("tr-TR")} adet üretim. Daha büyüğü için Ofis sekmesinden tesisini büyüt.
+      </p>
+      {(data.effects ?? []).map((e, i) => (
+        <div key={i} className="card border-loss/50 px-4 py-2.5 text-sm text-loss">
+          {e.label}
+        </div>
+      ))}
 
       {designing && <Designer ctx={ctx} busy={busy} onCreate={async (b) => (await act({ action: "create", ...b })) && setDesigning(false)} />}
 
@@ -148,7 +161,7 @@ export function Workshop({ cash, onState, notify }: { cash: number; stageLevel?:
       ) : (
         <ul className="space-y-3">
           {data.models.map((m) => (
-            <ModelCard key={m.id} m={m} ctx={ctx} cash={cash} busy={busy} act={act} />
+            <ModelCard key={m.id} m={m} ctx={ctx} cash={cash} busy={busy} act={act} batch={limits.batch} halted={!!data.halt} />
           ))}
         </ul>
       )}
@@ -241,13 +254,13 @@ function Designer({ ctx, busy, onCreate }: { ctx: Ctx; busy: boolean; onCreate: 
   );
 }
 
-function ModelCard({ m, ctx, cash, busy, act }: { m: ModelView; ctx: Ctx; cash: number; busy: boolean; act: (b: object) => Promise<boolean> }) {
+function ModelCard({ m, ctx, cash, busy, act, batch, halted }: { m: ModelView; ctx: Ctx; cash: number; busy: boolean; act: (b: object) => Promise<boolean>; batch: number; halted: boolean }) {
   const [price, setPrice] = useState(String(m.price));
   const [qty, setQty] = useState("10");
   useEffect(() => setPrice(String(m.price)), [m.price]);
   const p = Number(price) || 0;
   const live = useMemo(() => estimate(ctx, m.parts, p, m.id), [ctx, m.parts, p, m.id]);
-  const n = Math.max(0, Math.min(100, Math.trunc(Number(qty) || 0)));
+  const n = Math.max(0, Math.min(batch, Math.trunc(Number(qty) || 0)));
   const produceCost = n * m.unitCost;
   const margin = m.price - m.unitCost;
 
@@ -299,13 +312,13 @@ function ModelCard({ m, ctx, cash, busy, act }: { m: ModelView; ctx: Ctx; cash: 
           </label>
           <div className="flex gap-2">
             <input id={`q-${m.id}`} className="input num !py-2" inputMode="numeric" value={qty} onChange={(e) => setQty(e.target.value.replace(/\D/g, ""))} />
-            {[10, 50].map((x) => (
+            {[10, 50, ...(batch >= 400 ? [Math.round(batch / 2)] : [])].map((x) => (
               <button key={x} type="button" className="btn shrink-0 !px-2.5 !py-2 text-xs" onClick={() => setQty(String(x))}>
                 {x}
               </button>
             ))}
-            <button className="btn btn-primary shrink-0 !py-2" disabled={busy || n < 1 || produceCost > cash} onClick={() => act({ action: "produce", modelId: m.id, qty: n })}>
-              Üret
+            <button className="btn btn-primary shrink-0 !py-2" disabled={busy || halted || n < 1 || produceCost > cash} onClick={() => act({ action: "produce", modelId: m.id, qty: n })}>
+              {halted ? "Üretim durdu" : "Üret"}
             </button>
           </div>
         </div>
