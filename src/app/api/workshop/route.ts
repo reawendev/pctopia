@@ -77,7 +77,7 @@ async function apply(userId: string, g: Awaited<ReturnType<typeof gameContext>>,
       if (name.length < 2 || name.length > 30) throw new HttpError(400, "Model adı 2-30 karakter olmalı");
       if (models.some((m) => m.name.toLocaleLowerCase("tr") === name.toLocaleLowerCase("tr"))) throw new HttpError(409, "Bu isimde bir modelin zaten var");
       if (!isValidParts(body.parts)) throw new HttpError(400, "Parça seçimi geçersiz");
-      const fair = fairValue(body.parts, g.reputation, mult());
+      const fair = fairValue(body.parts, g.reputation, mult(), g.perks.premium);
       const price = validPrice(body.price ?? fair, fair);
       const { error } = await db().from("pc_models").insert({ company_id: g.company.id, name, parts: body.parts, price });
       if (error) throw new HttpError(500, error.message);
@@ -105,7 +105,7 @@ async function apply(userId: string, g: Awaited<ReturnType<typeof gameContext>>,
     }
     case "price": {
       const m = find();
-      const fair = fairValue(m.parts, g.reputation, mult());
+      const fair = fairValue(m.parts, g.reputation, mult(), g.perks.premium);
       const price = validPrice(body.price, fair);
       const listed = body.listed === undefined ? m.listed : !!body.listed;
       const patch: Record<string, unknown> = { price, listed };

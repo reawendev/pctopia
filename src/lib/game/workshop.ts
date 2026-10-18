@@ -93,11 +93,12 @@ export function segment(parts: Parts): string {
  * Piyasanın bu modele biçtiği "hak ettiği fiyat".
  * Parçaların piyasa değeri + montaj, darboğazda %12 indirim, itibara göre ±%10.
  */
-export function fairValue(parts: Parts, reputation: number, mult: PartMult = {}): number {
+export function fairValue(parts: Parts, reputation: number, mult: PartMult = {}, premium = 0): number {
   const parts$ = SLOTS.reduce((s, k) => s + partCost(k, parts[k], mult) * PART_MARKUP, 0);
   let v = parts$ + ASSEMBLY_COST * 1.5;
   if (isBottlenecked(parts)) v *= 0.88;
   v *= 0.9 + Math.max(0, Math.min(100, reputation)) / 500;
+  v *= 1 + premium; // Ar-Ge
   return Math.round(v / 10) * 10;
 }
 

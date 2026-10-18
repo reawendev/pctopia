@@ -70,13 +70,14 @@ type Ctx = {
   reputation: number;
   demandBonus: number;
   discount: number;
+  premium: number;
   mult: PartMult;
   listings: Listing[]; // pazardaki tüm ilanlar (benimkiler dahil)
   eventDemand: EventEffects["demand"];
 };
 
 function estimate(ctx: Ctx, parts: Parts, price: number, replaceId?: string) {
-  const fair = fairValue(parts, ctx.reputation, ctx.mult);
+  const fair = fairValue(parts, ctx.reputation, ctx.mult, ctx.premium);
   const seg = segmentId(parts);
   const a = appeal(price, fair, ctx.reputation, ctx.demandBonus);
   return {
@@ -123,6 +124,7 @@ export function Workshop({ cash, onState, notify }: { cash: number; stageLevel?:
     reputation: data.reputation,
     demandBonus: data.perks.demand,
     discount: data.perks.parts,
+    premium: data.perks.premium ?? 0,
     mult: data.event.parts ?? {},
     listings: [...data.market, ...data.mine],
     eventDemand: data.event.demand,
@@ -189,7 +191,7 @@ function PartPicker({ parts, setParts, mult }: { parts: Parts; setParts: (p: Par
 function Designer({ ctx, busy, onCreate }: { ctx: Ctx; busy: boolean; onCreate: (b: { name: string; parts: Parts; price: number }) => void }) {
   const [name, setName] = useState("");
   const [parts, setParts] = useState<Parts>({ cpu: "mid", gpu: "mid", ram: "mid", ssd: "mid" });
-  const fair = fairValue(parts, ctx.reputation, ctx.mult);
+  const fair = fairValue(parts, ctx.reputation, ctx.mult, ctx.premium);
   const [price, setPrice] = useState(String(fair));
   const [touched, setTouched] = useState(false);
   useEffect(() => {

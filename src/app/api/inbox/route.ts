@@ -2,6 +2,8 @@ import { isMissingTable } from "@/lib/server/company";
 import { gameContext } from "@/lib/server/context";
 import { syncSales } from "@/lib/server/workshop";
 import { syncFinance } from "@/lib/server/finance";
+import { syncResearch } from "@/lib/server/research";
+import { syncTenders } from "@/lib/server/tenders";
 import { offerView, syncOffers, type OfferRow } from "@/lib/server/offers";
 import { db, handle, HttpError, requireUser } from "@/lib/server/supabase";
 
@@ -12,12 +14,13 @@ type MsgRow = { id: string; from_company: string; to_company: string; subject: s
 
 export const GET = handle(async (req) => {
   const user = await requireUser(req);
+  const tendersChanged = await syncTenders();
   const g = await gameContext(user.id);
   const { company, owned } = g;
 
   // Sayfa açıkken 30 sn'de bir çağrılır: PC satışlarını ve teklifleri birlikte günceller
   const salesChanged = await syncSales(g.ctx);
-  const financeChanged = await syncFinance(user.id);
+  const financeChanged = (await syncFinance(user.id)) || tendersChanged || (await syncResearch(company.id, company.name));
   const { changed: offersChanged, ready } = await syncOffers(company, owned, g.netWorth, g.perks);
   const changed = salesChanged || offersChanged || financeChanged;
   if (!ready) {

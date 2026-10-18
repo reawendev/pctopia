@@ -12,6 +12,7 @@ import { currentEvent } from "./events";
 import { postAbout } from "./social";
 import { payShares } from "./finance";
 import { SALES_MANAGER_BONUS } from "../game/finance";
+import { techPerks } from "./research";
 import { db, HttpError } from "./supabase";
 
 export type ModelRow = {
@@ -75,7 +76,10 @@ export async function loadMarket(force = false): Promise<MarketListing[]> {
   const ids = Array.from(new Set(rows.map((m) => m.company_id)));
   const companies = new Map<string, any>();
   const demand = new Map<string, number>();
+  const premium = new Map<string, number>();
   if (ids.length) {
+    const tech = await techPerks(ids);
+    for (const [id, t] of tech) premium.set(id, t.premium);
     const [{ data: cos }, { data: rels }, { data: managers }] = await Promise.all([
       db().from("companies").select("*").in("id", ids),
       db().from("relationships").select("*").in("company_id", ids),
@@ -94,14 +98,14 @@ export async function loadMarket(force = false): Promise<MarketListing[]> {
           married: r.married,
         }))
       );
-      demand.set(id, perks.demand + (hasManager.has(id) ? SALES_MANAGER_BONUS : 0));
+      demand.set(id, perks.demand + (hasManager.has(id) ? SALES_MANAGER_BONUS : 0) + (tech.get(id)?.demand ?? 0));
     }
   }
   const mult = partMultipliers(currentEvent().effects);
   const listings: MarketListing[] = rows.map((m) => {
     const c = companies.get(m.company_id) ?? {};
     const rep = c.reputation ?? 50;
-    const fair = fairValue(m.parts, rep, mult);
+    const fair = fairValue(m.parts, rep, mult, premium.get(m.company_id) ?? 0);
     const price = Number(m.price);
     return {
       id: m.id,
@@ -133,7 +137,7 @@ function mergeOwn(market: MarketListing[], ctx: Ctx, own: ModelRow[]): Listing[]
   const others: Listing[] = market.filter((l) => l.companyId !== ctx.id);
   const mine: Listing[] = own
     .filter((m) => m.listed && m.stock > 0)
-    .map((m) => ({ id: m.id, companyId: ctx.id, seg: segmentId(m.parts), appeal: appeal(m.price, fairValue(m.parts, ctx.reputation, mult), ctx.reputation, ctx.perks.demand) }));
+    .map((m) => ({ id: m.id, companyId: ctx.id, seg: segmentId(m.parts), appeal: appeal(m.price, fairValue(m.parts, ctx.reputation, mult, ctx.perks.premium), ctx.reputation, ctx.perks.demand) }));
   return [...others, ...mine];
 }
 
@@ -191,7 +195,7 @@ export async function workshopView(ctx: Ctx, own: ModelRow[]) {
   const ev = currentEvent();
   const mult = partMultipliers(ev.effects);
   const models = own.map((m) => {
-    const fair = fairValue(m.parts, ctx.reputation, mult);
+    const fair = fairValue(m.parts, ctx.reputation, mult, ctx.perks.premium);
     const seg = segmentId(m.parts);
     const rivals = new Set(listings.filter((l) => l.seg === seg && l.companyId !== ctx.id && l.appeal > 0).map((l) => l.companyId)).size;
     return {
@@ -225,7 +229,7 @@ export async function workshopView(ctx: Ctx, own: ModelRow[]) {
 export async function reactToPrice(ctx: Ctx, m: ModelRow, firstListing: boolean): Promise<void> {
   if (m.last_post_at && Date.now() - new Date(m.last_post_at).getTime() < 30 * 60_000) return;
   const mult = partMultipliers(currentEvent().effects);
-  const fair = fairValue(m.parts, ctx.reputation, mult);
+  const fair = fairValue(m.parts, ctx.reputation, mult, ctx.perks.premium);
   const v = verdict(m.price, fair);
   const vars = { company: ctx.name, model: m.name, price: formatMoney(m.price), fair: formatMoney(fair), segment: segment(m.parts) };
   let posted = true;

@@ -4,6 +4,7 @@ import type { Perk } from "../game/life";
 import { stageFor } from "../game/stages";
 import { companyNetWorth, loadCompany, type CompanyRow } from "./company";
 import { companyPerks } from "./life";
+import { techPerks } from "./research";
 import { HttpError } from "./supabase";
 import { SALES_MANAGER_BONUS } from "../game/finance";
 import type { Owned } from "../game/economy";
@@ -31,6 +32,11 @@ export async function gameContext(userId: string): Promise<GameContext> {
   const perks = await companyPerks(company.id);
   // Satış müdürü: pazarda çekicilik +%15
   if (company._staff?.includes("satis")) perks.demand += SALES_MANAGER_BONUS;
+  // Ar-Ge
+  const tech = (await techPerks([company.id])).get(company.id)!;
+  perks.parts += tech.parts;
+  perks.demand += tech.demand;
+  perks.premium += tech.premium;
   return {
     company,
     owned,

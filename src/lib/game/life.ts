@@ -4,7 +4,7 @@
 import type { CharacterSpec } from "./config";
 
 export type Interest = "sanat" | "spor" | "teknoloji" | "doğa" | "gece hayatı" | "gastronomi" | "kitap" | "seyahat";
-export type Perk = "offer" | "shield" | "press" | "parts" | "demand";
+export type Perk = "offer" | "shield" | "press" | "parts" | "demand" | "premium";
 
 export const PERK_TEXT: Record<Perk, (x: number) => string> = {
   offer: (x) => `Teklif başarı şansı +%${Math.round(x * 100)}`,
@@ -12,10 +12,11 @@ export const PERK_TEXT: Record<Perk, (x: number) => string> = {
   press: (x) => `Olumlu haberlerin itibar etkisi +${Math.round(x)}`,
   parts: (x) => `PC parça maliyeti −%${Math.round(x * 100)}`,
   demand: (x) => `PC talebi +%${Math.round(x * 100)}`,
+  premium: (x) => `PC'lerin hak ettiği fiyat +%${Math.round(x * 100)}`,
 };
 
 /** Arkadaşken verdiği yarar (sevgili/nişanlı/eşken iki katı). */
-export const PERK_BASE: Record<Perk, number> = { offer: 0.03, shield: 0.15, press: 1, parts: 0.04, demand: 0.06 };
+export const PERK_BASE: Record<Perk, number> = { offer: 0.03, shield: 0.15, press: 1, parts: 0.04, demand: 0.06, premium: 0 };
 
 export type Npc = {
   id: string;
@@ -140,7 +141,7 @@ export type RelationState = { npcId: string; affection: number; engaged: boolean
 
 /** Arkadaş ve üstündeki kişilerin yararlarını toplar; partnerin yararı iki kat. */
 export function perksFrom(rels: RelationState[]): Record<Perk, number> {
-  const out: Record<Perk, number> = { offer: 0, shield: 0, press: 0, parts: 0, demand: 0 };
+  const out: Record<Perk, number> = { offer: 0, shield: 0, press: 0, parts: 0, demand: 0, premium: 0 };
   for (const r of rels) {
     const npc = NPC_BY_ID[r.npcId];
     if (!npc) continue;

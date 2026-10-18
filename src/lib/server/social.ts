@@ -117,6 +117,27 @@ export const EVENTS = {
     rep: 2,
     texts: ["Belediyenin okul laboratuvarları ihalesini {company} kazandı."],
   },
+  bid_won: {
+    author: "business",
+    rep: 0, // ihale kazanma itibarı sonuçlandırmada ayrıca verilir
+    texts: [
+      "İhale sonuçlandı: {buyer} için {qty} adet bilgisayarı {company} sağlayacak. Birim fiyat {price}.",
+      "{company}, {buyer} ihalesini {price} birim fiyatla aldı. Toplam {total}.",
+    ],
+  },
+  bid_failed: {
+    author: "watchdog",
+    rep: 0, // ceza sonuçlandırmada ayrıca uygulanır
+    texts: [
+      "{company}, {buyer} ihalesini kazandı ama teslimat yapamadı. Teminatı yandı.",
+      "Skandal: {company} verdiği teklifin arkasında duramadı. {buyer} ihalesi el değiştirdi.",
+    ],
+  },
+  patent: {
+    author: "news",
+    rep: 2,
+    texts: ["{company} Ar-Ge ekibi “{tech}” projesini tamamladı ve patentini aldı.", "Teknoloji yarışında ilk adım {company} şirketinden: “{tech}” patenti onlarda."],
+  },
 } satisfies Record<string, EventDef>;
 
 export type EventId = keyof typeof EVENTS;

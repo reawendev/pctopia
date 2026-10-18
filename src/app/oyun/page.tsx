@@ -7,6 +7,8 @@ import { Appearance } from "@/components/Appearance";
 import { Feed } from "@/components/Feed";
 import { Finance } from "@/components/Finance";
 import { Properties } from "@/components/Properties";
+import { Research } from "@/components/Research";
+import { Tenders } from "@/components/Tenders";
 import { Icon } from "@/components/Icon";
 import { Life } from "@/components/Life";
 import { Mailbox, type InboxData } from "@/components/Mailbox";
@@ -77,7 +79,7 @@ export default function Oyun() {
   const [journal, setJournal] = useState<JournalEntry[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [tab, setTab] = useState<Tab>("ofis");
-  const [sub, setSub] = useState<{ uretim: "donanim" | "atolye"; gundem: "akis" | "siralama" | "seref"; hayat: "iliskiler" | "mulkler" }>({ uretim: "donanim", gundem: "akis", hayat: "iliskiler" });
+  const [sub, setSub] = useState<{ uretim: "donanim" | "atolye" | "ihale" | "arge"; gundem: "akis" | "siralama" | "seref"; hayat: "iliskiler" | "mulkler" }>({ uretim: "donanim", gundem: "akis", hayat: "iliskiler" });
   const [dealTo, setDealTo] = useState<string | null>(null);
   const [mailTo, setMailTo] = useState<string | null>(null);
   const [world, setWorld] = useState<WorldData | null>(null);
@@ -369,8 +371,10 @@ export default function Oyun() {
             <Segmented
               value={sub.uretim}
               options={[
-                ["donanim", "Donanım (gelir makineleri)"],
+                ["donanim", "Donanım"],
                 ["atolye", "PC Atölyesi"],
+                ["ihale", "İhaleler"],
+                ["arge", "Ar-Ge"],
               ]}
               onChange={(v) => setSub((s) => ({ ...s, uretim: v as any }))}
             />
@@ -404,8 +408,12 @@ export default function Oyun() {
                   );
                 })}
               </ul>
-            ) : (
+            ) : sub.uretim === "atolye" ? (
               <Workshop cash={company.cash} stageLevel={career.stage.level} onState={apply} notify={setToast} />
+            ) : sub.uretim === "ihale" ? (
+              <Tenders cash={company.cash} reputation={rep} now={serverNow} onState={apply} notify={setToast} />
+            ) : (
+              <Research cash={company.cash} now={serverNow} onState={apply} notify={setToast} />
             )}
           </div>
         )}
@@ -532,9 +540,9 @@ function Badge({ n }: { n: number }) {
 
 function Segmented({ value, options, onChange }: { value: string; options: [string, string][]; onChange: (v: string) => void }) {
   return (
-    <div className="inline-flex rounded-md border border-line bg-panel p-0.5 text-sm" role="tablist">
+    <div className="inline-flex max-w-full overflow-x-auto rounded-md border border-line bg-panel p-0.5 text-sm" role="tablist">
       {options.map(([k, label]) => (
-        <button key={k} role="tab" aria-selected={value === k} onClick={() => onChange(k)} className={`rounded px-3 py-1.5 ${value === k ? "bg-raised text-white" : "text-mute hover:text-white"}`}>
+        <button key={k} role="tab" aria-selected={value === k} onClick={() => onChange(k)} className={`shrink-0 whitespace-nowrap rounded px-3 py-1.5 ${value === k ? "bg-raised text-white" : "text-mute hover:text-white"}`}>
           {label}
         </button>
       ))}

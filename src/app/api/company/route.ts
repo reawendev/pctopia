@@ -4,6 +4,8 @@ import { isMissingTable, loadCompany, loadJournal, logEvent, view } from "@/lib/
 import { gameContext } from "@/lib/server/context";
 import { syncSales } from "@/lib/server/workshop";
 import { syncFinance } from "@/lib/server/finance";
+import { syncResearch } from "@/lib/server/research";
+import { syncTenders } from "@/lib/server/tenders";
 import { db, handle, HttpError, requireUser } from "@/lib/server/supabase";
 
 export const dynamic = "force-dynamic";
@@ -14,10 +16,12 @@ export const GET = handle(async (req) => {
   let state = await loadCompany(user.id);
   if (!state) return { hasCompany: false, isAdmin: user.isAdmin };
   // Bekleyen PC satışları, maaşlar, otomatik tahsilat, vadeler
+  const tenders = await syncTenders();
   const g = await gameContext(user.id);
   const sold = await syncSales(g.ctx);
   const fin = await syncFinance(user.id);
-  if (sold || fin) state = (await loadCompany(user.id))!;
+  const rnd = await syncResearch(g.company.id, g.company.name);
+  if (sold || fin || tenders || rnd) state = (await loadCompany(user.id))!;
   const journal = await loadJournal(state.company.id);
   return { hasCompany: true, isAdmin: user.isAdmin, journal, ...view(state.company, state.owned, state.holdings) };
 });

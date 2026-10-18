@@ -5,6 +5,7 @@ import { fairValue, segment, verdict } from "@/lib/game/workshop";
 import { isMissingTable, loadCompany } from "@/lib/server/company";
 import { currentEvent } from "@/lib/server/events";
 import { rankCompanies } from "@/lib/server/ranking";
+import { techPerks } from "@/lib/server/research";
 import { db, handle, HttpError, requireUser } from "@/lib/server/supabase";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +36,7 @@ export const GET = handle(async (req) => {
     optional<any>(db().from("employees").select("role").eq("company_id", id)),
   ]);
   const mult = partMultipliers(currentEvent().effects);
+  const premium = (await techPerks([id])).get(id)?.premium ?? 0;
   const now = Date.now();
   const people = rels
     .map((x) => {
@@ -61,7 +63,7 @@ export const GET = handle(async (req) => {
     total: ranked.length,
     netWorth: r.netWorth,
     products: models.map((m) => {
-      const fair = fairValue(m.parts, r.reputation, mult);
+      const fair = fairValue(m.parts, r.reputation, mult, premium);
       return { id: m.id, name: m.name, price: Number(m.price), fair, verdict: verdict(Number(m.price), fair), segment: segment(m.parts), inStock: m.stock > 0, sold: m.sold_total };
     }),
     belongings: status.map((s) => STATUS_BY_ID[s.item_id]?.name).filter(Boolean),

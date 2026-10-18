@@ -15,6 +15,7 @@
    - `supabase/migrations/006_sezonlar.sql`
    - `supabase/migrations/007_finans.sql`
    - `supabase/migrations/008_sosyal_profil.sql`
+   - `supabase/migrations/009_ihale_arge.sql`
 
    Mevcut bir veritabanını güncelliyorsan yalnızca henüz çalıştırmadığın `migrations/` dosyalarını çalıştır.
 2. `.env.example` dosyasını `.env.local` olarak kopyala, Supabase anahtarlarını gir.
@@ -64,6 +65,17 @@ Vercel'e bağla, ortam değişkenlerini ekle: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_
 - **Ortak pazar:** 4 segment (ofis, oyun, üst segment, iş istasyonu). Segment talebi D = 2 × taban × (1 + 0,5 × (satıcı şirket − 1)) × olay çarpanı. Her ilanın çekiciliği = fiyat çarpanı × itibar × (1 + talep yararı); pazarda ayrıca çekiciliği 1 olan kurgusal rakipler var. Satış hızı = D × çekicilik / (toplam çekicilik + 1). Ucuz ve itibarlı olan pay çalar; fiyat/değer 1,5'in üstünde çekicilik sıfırdır, 2'nin üstü etikete yazılamaz.
 - Pazar listesi 15 sn önbelleklenir (`loadMarket`); fiyat/stok değişikliğinde önbellek temizlenir.
 - Satışlar gelir gibi tembel hesaplanır (en fazla 12 saat birikir), `settle_sales` ile bir kez kasaya geçer.
+
+## İhaleler
+
+- `src/lib/server/tenders.ts`: her 2 saatte bir yeni ihale, teklifler 4 saat açık (aynı anda iki ihale). Şartname (alıcı, adet, en düşük parça kaliteleri, tavan birim fiyat) ve kurgusal rakibin kapalı zarfı gizli tohumdan üretilir, ilk ihtiyaçta `tenders` tablosuna yazılır.
+- Teklif verirken toplam tutarın %5'i teminat olarak kasadan alınır. Puan = birim fiyat × (1,2 − itibar/250); en düşük puan kazanır. Kurgusal rakibin puanı itibar 60 ile hesaplanır.
+- Kapanışta (`settle_tender`, tek işlem) kazananın deposundan teslimat yapılır: stok yoksa ya da model şartnameye uymuyorsa teminat yanar, itibar −6, sıra sonrakine geçer. Kazanan itibar +3 alır; diğer teminatlar iade edilir.
+
+## Ar-Ge
+
+- `src/lib/game/research.ts`: 6 proje (montaj hattı, tedarikçi anlaşmaları, sessiz soğutma, endüstriyel tasarım, yapay zekâ hızlandırıcı, yeni nesil grafik mimarisi). Etkiler: parça maliyeti indirimi, hak edilen fiyat (`fairValue` premium) ve pazarda çekicilik.
+- Aynı anda tek proje, bedel peşin. Patentli iki projeyi ilk bitiren 24 saat tek başına kullanır; patent süresinde bitirenler patent bitince yararlanır. Hesap tamamen kayıtlardan yapılır, zamanlayıcı gerekmez.
 
 ## Dünya olayları
 
@@ -147,7 +159,7 @@ Next.js 14, yalnızca GET içeren route'lardaki `fetch` isteklerini kalıcı ola
 - [x] Oyuncular arası anlaşmalar, çalışanlar, banka, mülkler
 - [x] Şirket profili, görsel yükleme, oyuncu paylaşımları
 - [x] Borsa: otomotiv, savunma, denizcilik, havacılık, enerji, yarı iletken, lojistik, telekom hisseleri
-- [ ] Şirket başarısına bağlı yatırımlar (süreli büyük projeler, ihaleler)
+- [x] İhaleler ve Ar-Ge
 - [ ] Ar-Ge
 - [ ] Mobil sürüm (Capacitor ile Android/iOS)
 - [ ] Oyuncular arası etkileşim (ihale, satın alma teklifi)
