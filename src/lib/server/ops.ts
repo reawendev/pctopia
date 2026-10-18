@@ -105,9 +105,25 @@ export async function runOp(attacker: { id: string; name: string; staff: Role[] 
   const { rows } = await equityBoard();
   const t = rows.get(targetId)!;
 
-  const { data: paid, error: payErr } = await db().rpc("spend_cash", { p_company: attacker.id, p_amount: row.cost });
-  if (payErr) throw new HttpError(payErr.message.includes("spend_cash") ? 503 : 500, payErr.message.includes("spend_cash") ? NEED : payErr.message);
-  if (!paid) throw new HttpError(400, `Bu operasyon için kasada ${formatMoney(row.cost)} olmalı`);
+  // Sınırlar ve ödeme tek kilitli işlemde (013_banka_kilit.sql): aynı anda gönderilen istekler sınırı aşamaz
+  const { data: logId, error: payErr } = await db().rpc("ops_reserve", {
+    p_attacker: attacker.id,
+    p_target: t.id,
+    p_kind: op.id,
+    p_cost: row.cost,
+    p_hours: OP_WINDOW_HOURS,
+    p_per_window: OPS_PER_WINDOW,
+    p_hits: HITS_PER_TARGET,
+  });
+  if (payErr) {
+    const m = payErr.message;
+    if (/Yetersiz nakit/.test(m)) throw new HttpError(400, `Bu operasyon için kasada ${formatMoney(row.cost)} olmalı`);
+    if (/Operasyon sınırı/.test(m)) throw new HttpError(429, `${OP_WINDOW_HOURS} saatte en fazla ${OPS_PER_WINDOW} operasyon yürütebilirsin`);
+    if (/Aynı hedef/.test(m)) throw new HttpError(429, `Bu şirkete ${OP_WINDOW_HOURS} saatte bir operasyon düzenleyebilirsin`);
+    if (/Hedef tetikte/.test(m)) throw new HttpError(429, "Hedef tetikte: son saatlerde çok saldırı aldı");
+    if (/ops_reserve/.test(m)) throw new HttpError(503, "Gizli operasyonlar için veritabanında 013_banka_kilit.sql çalıştırılmalı");
+    throw new HttpError(500, m);
+  }
 
   const { success, caught } = roll(op);
   let message = "";
@@ -167,7 +183,7 @@ export async function runOp(attacker: { id: string; name: string; staff: Role[] 
     message += ` Ama yakalandın: haber oldu, itibarın ${-rep} düştü.`;
   }
 
-  await db().from("ops_log").insert({ attacker: attacker.id, target: t.id, kind: op.id, cost: row.cost, success, caught, detail });
+  await db().from("ops_log").update({ success, caught, detail, settled: true }).eq("id", logId);
   await logEvent(attacker.id, "ops", `Gizli operasyon (${t.name}): ${op.name}. ${success ? "Başarılı" : "Başarısız"}${caught ? ", yakalandı" : ""}. Bedel ${formatMoney(row.cost)}.`, -row.cost);
   return { success, caught, message: message.trim(), detail };
 }

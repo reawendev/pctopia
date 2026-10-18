@@ -1,6 +1,6 @@
 // Finans — sunucu tarafı: tahsilat, maaşlar, banka vadesi, anlaşmaların mutabakatı, gelir ortaklığı ödemeleri.
 
-import { BAN_HOURS, loanOwed, salary, type LoanTerms, type RevshareTerms, type Role } from "../game/finance";
+import { BAN_HOURS, DEPOSIT_DAILY_RATE, loanOwed, salary, type LoanTerms, type RevshareTerms, type Role } from "../game/finance";
 import { formatMoney, incomePerHour, pendingIncome } from "../game/economy";
 import { OFFLINE_CAP_HOURS } from "../game/config";
 import { isMissingTable, loadCompany, logEvent, type CompanyRow } from "./company";
@@ -126,30 +126,34 @@ export async function syncFinance(userId: string): Promise<boolean> {
   const { data: bank, error: bErr } = await db().from("bank_accounts").select("*").eq("company_id", company.id).maybeSingle();
   if (bErr && !isMissingTable(bErr)) throw new HttpError(500, bErr.message);
   if (bank && Number(bank.loan_principal) > 0 && bank.loan_due_at && new Date(bank.loan_due_at).getTime() <= now) {
-    const fresh = (await loadCompany(userId))!.company;
-    const owed = loanOwed(Number(bank.loan_principal), bank.loan_rate, new Date(bank.loan_taken_at).getTime(), new Date(bank.loan_due_at).getTime(), now);
-    const cash = Number(fresh.cash);
-    const paid = Math.min(cash, owed);
-    const defaulted = paid < owed;
-    const { error } = await db().rpc("bank_apply", {
+    // Tek kilitli işlem: önce kasa, sonra mevduat; kalan borç silinmez (013_banka_kilit.sql)
+    const { data: r, error } = await db().rpc("bank_op", {
       p_company: company.id,
-      p_cash_delta: -paid,
-      p_deposit: Number(bank.deposit),
-      p_deposit_at: bank.deposit_at,
-      p_loan_principal: 0,
+      p_action: "mature",
+      p_amount: 0,
+      p_days: 0,
       p_loan_rate: 0,
-      p_loan_taken_at: null,
-      p_loan_due_at: null,
-      p_banned_until: defaulted ? new Date(now + BAN_HOURS * 3_600_000).toISOString() : bank.banned_until,
+      p_deposit_rate: DEPOSIT_DAILY_RATE,
+      p_limit: 0,
+      p_ban_hours: BAN_HOURS,
     });
-    if (error) throw new HttpError(500, error.message);
-    changed = true;
-    if (defaulted) {
-      await logEvent(company.id, "bank", `Kredinin vadesi doldu ve ${formatMoney(owed)} borcun ${formatMoney(paid)} kadarı ödenebildi. Banka ${BAN_HOURS} saat kredi vermeyecek.`, -paid);
-      await db().rpc("adjust_reputation", { p_company: company.id, p_delta: -10 });
-      await postAbout(company.id, "bank_default", { company: company.name });
-    } else {
-      await logEvent(company.id, "bank", `Kredi vadesinde otomatik ödendi: ${formatMoney(owed)}.`, -owed);
+    // 013 henüz çalıştırılmadıysa vadeyi bekletir (eski, açıklı yola dönmez)
+    if (error && !/bank_op/.test(error.message)) throw new HttpError(500, error.message);
+    if (!error && r) {
+      changed = true;
+      const owed = Number(r.owed), paid = Number(r.paid), fromDep = Number(r.fromDeposit), rest = Number(r.rest);
+      if (rest > 0) {
+        await logEvent(
+          company.id,
+          "bank",
+          `Kredinin vadesi doldu: ${formatMoney(owed)} borcun ${formatMoney(paid + fromDep)} kadarı kasadan${fromDep > 0 ? " ve mevduattan" : ""} tahsil edildi. Kalan ${formatMoney(rest)} borç yarın yeniden istenecek; banka ${BAN_HOURS} saat kredi vermeyecek.`,
+          -paid
+        );
+        await db().rpc("adjust_reputation", { p_company: company.id, p_delta: -10 });
+        await postAbout(company.id, "bank_default", { company: company.name });
+      } else {
+        await logEvent(company.id, "bank", `Kredi vadesinde otomatik ödendi: ${formatMoney(owed)}${fromDep > 0 ? ` (${formatMoney(fromDep)} mevduattan)` : ""}.`, -paid);
+      }
     }
   }
 

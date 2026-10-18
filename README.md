@@ -19,6 +19,7 @@
    - `supabase/migrations/010_tesis_kriz.sql`
    - `supabase/migrations/011_halka_arz_operasyon.sql`
    - `supabase/migrations/012_kulup_bahis.sql`
+   - `supabase/migrations/013_banka_kilit.sql`
 
    Mevcut bir veritabanını güncelliyorsan yalnızca henüz çalıştırmadığın `migrations/` dosyalarını çalıştır.
 2. `.env.example` dosyasını `.env.local` olarak kopyala, Supabase anahtarlarını gir.
@@ -150,6 +151,10 @@ Hepsi oyun parasıyla; gerçek parayla hiçbir bağlantısı yoktur ve olmamalı
 - Basamaklar: tanışık (0) → arkadaş (20) → flört (40) → sevgili (60) → nişanlı (yüzük + teklif, 80+ yakınlıkta şansa bağlı) → evli (düğün).
 - Aynı anda tek romantik ilişki. Yakınlık her 8 saatte 1 azalır; nişan/evlilikte 40'ın altına düşmez. Etkinlik bekleme süresi 20 dk, davet 60 dk.
 - Arkadaş ve üstü kişilerin yararları toplanır, partnerinki iki kat: teklif başarısı, kriz kalkanı, basın, parça indirimi, PC talebi (üst sınırlı).
+
+## Para hareketlerinde kural: oku-değiştir-yaz yok
+
+Bir işlemin kontrolü (bakiye, sınır, "açık kredi var mı") ve para hareketi aynı veritabanı fonksiyonunda, satır kilidi altında yapılmalı. İstemciden okunan durumu JS'te değiştirip geri yazmak, aynı anda gönderilen isteklerde istismara açıktır. 013'te kapatılan örnekler: paralel kredi çekme (kasaya 12 kredi, kayda 1 kredi), mevduatın paralel olarak birden çok kez çekilmesi, gizli operasyon sınırlarının paralel isteklerle aşılması. Banka işlemleri artık `bank_op`, operasyonlar `ops_reserve` üzerinden yapılır. Vadede önce kasa, sonra mevduat tahsil edilir; yetmeyen kısım silinmez, borç olarak kalır.
 
 ## Bilinen tuzak: Next.js önbelleği
 
