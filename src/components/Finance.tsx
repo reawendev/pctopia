@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { CompanyMark } from "./Portrait";
+import { Equity } from "./Equity";
 import type { LogoSpec } from "@/lib/game/config";
 import { formatMoney } from "@/lib/game/economy";
 import { DEAL_LABEL, LOAN_TERMS, loanAtMaturity, type DealKind, type Role } from "@/lib/game/finance";
@@ -11,7 +12,7 @@ import { ago } from "@/lib/time";
 
 type Notify = (m: string) => void;
 type OnState = (s: any) => void;
-type Sub = "banka" | "calisanlar" | "anlasmalar";
+type Sub = "banka" | "calisanlar" | "anlasmalar" | "halkaarz";
 
 function left(ms: number) {
   const m = Math.max(0, Math.floor(ms / 60000));
@@ -51,15 +52,16 @@ export function Finance({ cash, now, onState, notify, pendingDeals, initialTo }:
   }, [initialTo]);
   return (
     <div className="space-y-3">
-      <div className="inline-flex rounded-md border border-line bg-panel p-0.5 text-sm" role="tablist">
+      <div className="inline-flex max-w-full overflow-x-auto rounded-md border border-line bg-panel p-0.5 text-sm" role="tablist">
         {(
           [
             ["banka", "Banka"],
             ["calisanlar", "Çalışanlar"],
             ["anlasmalar", "Anlaşmalar"],
+            ["halkaarz", "Halka arz"],
           ] as [Sub, string][]
         ).map(([k, l]) => (
-          <button key={k} role="tab" aria-selected={sub === k} onClick={() => setSub(k)} className={`rounded px-3 py-1.5 ${sub === k ? "bg-raised text-white" : "text-mute hover:text-white"}`}>
+          <button key={k} role="tab" aria-selected={sub === k} onClick={() => setSub(k)} className={`shrink-0 whitespace-nowrap rounded px-3 py-1.5 ${sub === k ? "bg-raised text-white" : "text-mute hover:text-white"}`}>
             {l}
             {k === "anlasmalar" && pendingDeals > 0 && <span className="num ml-1.5 rounded-full bg-amber px-1.5 text-[10px] font-semibold text-ink">{pendingDeals}</span>}
           </button>
@@ -67,6 +69,7 @@ export function Finance({ cash, now, onState, notify, pendingDeals, initialTo }:
       </div>
       {sub === "banka" && <Bank cash={cash} now={now} onState={onState} notify={notify} />}
       {sub === "calisanlar" && <Staff cash={cash} onState={onState} notify={notify} />}
+      {sub === "halkaarz" && <Equity cash={cash} onState={onState} notify={notify} />}
       {sub === "anlasmalar" && <Deals cash={cash} now={now} onState={onState} notify={notify} initialTo={initialTo} />}
     </div>
   );

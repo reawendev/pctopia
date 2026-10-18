@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Avatar } from "@/components/Avatar";
+import { EquityRow, type EquityListing } from "@/components/Equity";
 import { Feed } from "@/components/Feed";
+import { Operations } from "@/components/Operations";
 import { CompanyMark, Portrait } from "@/components/Portrait";
 import type { CharacterSpec, LogoSpec } from "@/lib/game/config";
 import { formatCompactMoney, formatMoney } from "@/lib/game/economy";
@@ -13,6 +15,10 @@ import { useRequireSession } from "@/lib/useSession";
 
 type Profile = {
   isMe: boolean;
+  myCash: number;
+  equity: (EquityListing & { ipo: string | null; shareholders: { id: string; name: string; shares: number }[] }) | null;
+  companyValue: number;
+  ownership: number;
   company: { id: string; name: string; founderName: string; logo: LogoSpec; logoUrl: string | null; portraitUrl: string | null; character: CharacterSpec; createdAt: string | null; reputation: number };
   rank: number;
   total: number;
@@ -36,6 +42,21 @@ export default function SirketProfili({ params }: { params: { id: string } }) {
   const [p, setP] = useState<Profile | null>(null);
   const [error, setError] = useState("");
   const [now, setNow] = useState(() => Date.now());
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function trade(body: object) {
+    setBusy(true);
+    setMsg("");
+    try {
+      const r = await apiFetch<any>("/api/equity", { method: "POST", body: JSON.stringify(body) });
+      setMsg(r.message);
+      setP(await apiFetch<Profile>(`/api/profile?id=${encodeURIComponent(params.id)}`));
+    } catch (e: any) {
+      setMsg(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   useEffect(() => {
     if (!ready) return;
@@ -103,7 +124,7 @@ export default function SirketProfili({ params }: { params: { id: string } }) {
         </div>
         <dl className="grid grid-cols-3 gap-px border-t border-line bg-line">
           <div className="bg-panel px-4 py-3">
-            <dt className="text-xs text-mute">Net değer</dt>
+            <dt className="text-xs text-mute">{p.ownership < 1 ? `Kurucunun payı (%${Math.round(p.ownership * 100)})` : "Net değer"}</dt>
             <dd className="num text-base sm:text-lg">{formatCompactMoney(p.netWorth)}</dd>
           </div>
           <div className="bg-panel px-4 py-3">
@@ -152,9 +173,42 @@ export default function SirketProfili({ params }: { params: { id: string } }) {
             <h2 className="mb-2 px-1 font-serif font-semibold">Hakkında konuşulanlar</h2>
             <Feed now={now} scope="company" companyId={c.id} compact />
           </div>
+
+          {!p.isMe && <Operations targetId={c.id} targetName={c.name} cash={p.myCash} notify={setMsg} />}
         </div>
 
         <aside className="space-y-3">
+          {p.equity && (
+            <section className="card p-4">
+              <div className="flex items-baseline justify-between gap-2">
+                <h2 className="font-serif font-semibold">Hisseleri</h2>
+                {p.equity.ipo && <span className="num text-sm">${p.equity.price.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>}
+              </div>
+              {!p.equity.ipo ? (
+                <p className="mt-2 text-sm text-mute">Halka açık değil; şirketin tamamı kurucusunda.</p>
+              ) : p.isMe ? (
+                <p className="mt-2 text-sm text-mute">Halka açık. Hisse işlemlerini Finans sekmesinden yaparsın.</p>
+              ) : (
+                <ul className="mt-1">
+                  <EquityRow c={p.equity} cash={p.myCash} busy={busy} post={trade} compact />
+                </ul>
+              )}
+              {p.equity.shareholders.length > 0 && (
+                <ul className="mt-2 space-y-0.5 border-t border-line pt-2 text-xs">
+                  {p.equity.shareholders.map((s) => (
+                    <li key={s.id} className="flex justify-between gap-2">
+                      <Link href={`/sirket/${s.id}`} className="truncate hover:text-amber">
+                        {s.name}
+                      </Link>
+                      <span className="num shrink-0 text-mute">%{(Math.round((s.shares / p.equity!.total) * 1000) / 10).toLocaleString("tr-TR")}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {msg && <p className="mt-2 text-xs text-amber">{msg}</p>}
+            </section>
+          )}
+
           <section className="card p-4">
             <h2 className="font-serif font-semibold">Özel hayatı</h2>
             {p.partner ? (

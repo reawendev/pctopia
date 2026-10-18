@@ -6,6 +6,7 @@ import { isMissingTable, loadCompany } from "@/lib/server/company";
 import { currentEvent } from "@/lib/server/events";
 import { rankCompanies } from "@/lib/server/ranking";
 import { techPerks } from "@/lib/server/research";
+import { equityBoard } from "@/lib/server/equity";
 import { db, handle, HttpError, requireUser } from "@/lib/server/supabase";
 
 export const dynamic = "force-dynamic";
@@ -46,8 +47,40 @@ export const GET = handle(async (req) => {
     .filter((p) => p.npc);
   const partner = people.find((p) => stageRank(p.stage) >= stageRank("sevgili"));
 
+  const { rows, holdings } = await equityBoard();
+  const e = rows.get(id);
+  const myHolding = me ? holdings.find((h) => h.holder === me.company.id && h.target === id) : undefined;
+  const equity = e
+    ? {
+        id: e.id,
+        name: e.name,
+        founderName: e.founderName,
+        logo: e.logo,
+        logoUrl: e.logoUrl,
+        reputation: e.reputation,
+        price: e.price,
+        total: e.total,
+        founder: e.founder,
+        held: e.held,
+        float: e.float,
+        value: e.value,
+        ipo: e.ipo,
+        myShares: myHolding?.shares ?? 0,
+        myBasis: myHolding?.cost_basis ?? 0,
+        shareholders: holdings
+          .filter((h) => h.target === id)
+          .map((h) => ({ id: h.holder, name: rows.get(h.holder)?.name ?? "Kapanmış şirket", shares: h.shares }))
+          .sort((a, b) => b.shares - a.shares)
+          .slice(0, 5),
+      }
+    : null;
+
   return {
     isMe: me?.company.id === id,
+    myCash: me ? Number(me.company.cash) : 0,
+    equity,
+    companyValue: r.companyValue,
+    ownership: r.ownership,
     company: {
       id: r.id,
       name: r.name,

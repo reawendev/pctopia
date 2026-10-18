@@ -55,7 +55,7 @@ type State = {
   staff?: string[];
 };
 
-type BoardRow = { id: string; rank: number; name: string; founderName: string; logo: LogoSpec; logoUrl: string | null; netWorth: number; reputation: number; isMe: boolean };
+type BoardRow = { id: string; rank: number; name: string; founderName: string; logo: LogoSpec; logoUrl: string | null; netWorth: number; reputation: number; isMe: boolean; ownership?: number };
 type Board = { total: number; top: BoardRow[]; me: { rank: number; netWorth: number } | null };
 
 type Tab = "ofis" | "uretim" | "borsa" | "finans" | "posta" | "hayat" | "gundem";
@@ -479,6 +479,7 @@ export default function Oyun() {
                           </div>
                           <div className="truncate text-xs text-mute">
                             {c.founderName}, {stageFor(c.netWorth).stage.title}
+                            {c.ownership !== undefined && c.ownership < 1 ? `, halka açık (kurucu %${Math.round(c.ownership * 100)})` : ""}
                           </div>
                         </div>
                         <span className={`num hidden w-16 text-right text-xs sm:block ${repTone(c.reputation)}`}>itibar {c.reputation}</span>

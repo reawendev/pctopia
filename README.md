@@ -17,6 +17,7 @@
    - `supabase/migrations/008_sosyal_profil.sql`
    - `supabase/migrations/009_ihale_arge.sql`
    - `supabase/migrations/010_tesis_kriz.sql`
+   - `supabase/migrations/011_halka_arz_operasyon.sql`
 
    Mevcut bir veritabanını güncelliyorsan yalnızca henüz çalıştırmadığın `migrations/` dosyalarını çalıştır.
 2. `.env.example` dosyasını `.env.local` olarak kopyala, Supabase anahtarlarını gir.
@@ -87,6 +88,19 @@ Vercel'e bağla, ortam değişkenlerini ekle: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_
 
 - Teklif havuzunda şirketin durumuna göre çıkan krizler (`src/lib/server/offers.ts`): grev (çalışanı ya da büyük tesisi olana), arızalı parti / geri çağırma (bir modelinden 30+ satan), tedarik krizi, vergi incelemesi (muhasebecisi olan daha rahat geçer), depo yangını, müşteri verisi sızıntısı. Yanıtsız kalan kriz kendi "görmezden gel" sonucuyla kapanır.
 - Seçenekler para dışında itibar, sosyal medya haberi ve süreli etki doğurabilir. Süreli etkiler `company_effects` tablosunda tutulur: `halt` (üretim durur), `demand` (PC çekiciliği; −1 satışı durdurur), `parts` (parça maliyeti artar). Ofis'te "Süren krizler" kartında görünür.
+
+## Halka arz
+
+- `src/lib/game/equity.ts`, `src/lib/server/equity.ts`. Her şirket 1.000 kurucu hissesiyle başlar. Halka arzda (en az $100 bin şirket değeri, en az 50 hisse) yeni hisse basılır: kasaya fiyat × adet × 0,95 girer, kurucu payı oransal küçülür; kurucu %51'in altına inemez.
+- Fiyat = oyuncu hisseleri hariç şirket değeri × piyasa algısı (itibar 0 → ×0,75, 100 → ×1,25) ÷ toplam hisse. Oyuncular piyasadaki serbest hisseyi %1 komisyonla alıp satar; şirket kendi hissesini geri alıp iptal edebilir.
+- **Sıralama kurucunun payına göredir:** şirket değeri × kurucu hissesi ÷ toplam hisse. Elindeki diğer şirket hisseleri şirket değerine eklenir.
+
+## Gizli operasyonlar
+
+- `src/lib/game/ops.ts`, `src/lib/server/ops.ts`: karalama kampanyası, sahte yorum dalgası, endüstriyel casusluk (rakibin Ar-Ge'sini kopyala), ihale zarfını ele geçir (rakibin teklifini öğren), yönetici ayartma. Rakibin profil sayfasından yapılır.
+- Bedel rakibin değerinin %0,4'ü (en az $3.000) × operasyon katsayısı. Başarı ve yakalanma ayrı zarlarla belirlenir. Yakalanan saldırgan itibar −8 kaybeder (PR uzmanı yarıya indirir), haber çıkar ve hedef kimin yaptığını öğrenir; yakalanmazsa hedef yalnızca olanı görür.
+- Sınırlar: saldırgan 6 saatte en fazla 3 operasyon, aynı hedefe 6 saatte 1; son 6 saatte 2 başarılı saldırı alan şirket korunur.
+- Testler için `OPS_TEST_ROLLS` ortam değişkeni zarları sabitler; canlıda tanımlama.
 
 ## Dünya olayları
 
@@ -172,6 +186,8 @@ Next.js 14, yalnızca GET içeren route'lardaki `fetch` isteklerini kalıcı ola
 - [x] Borsa: otomotiv, savunma, denizcilik, havacılık, enerji, yarı iletken, lojistik, telekom hisseleri
 - [x] İhaleler ve Ar-Ge
 - [x] Tesis büyütme ve şirkete özel krizler
+- [x] Halka arz ve gizli operasyonlar
 - [ ] Ar-Ge
 - [ ] Mobil sürüm (Capacitor ile Android/iOS)
-- [ ] Oyuncular arası etkileşim (ihale, satın alma teklifi)
+- [ ] Kumar ve bahis (oyun parasıyla)
+- [ ] Satın alma ve birleşme, temettü

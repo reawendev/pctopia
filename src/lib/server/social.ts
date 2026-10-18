@@ -169,6 +169,26 @@ export const EVENTS = {
     rep: 0,
     texts: ["{company} müşteri verilerinin sızdığını gizledi. Şirketten açıklama yok.", "Skandal: {company} veri sızıntısını örtbas etmeye çalıştı."],
   },
+  ipo: {
+    author: "business",
+    rep: 1,
+    texts: ["{company} halka açıldı! Hisseler {price} fiyatla işlem görmeye başladı, şirketin %{pct} kısmı yatırımcılarda.", "Borsada yeni isim: {company}. Halka arz fiyatı {price}."],
+  },
+  smear: {
+    author: "gossip",
+    rep: -6,
+    texts: ["Kulis: {company} müşteri şikâyetlerini yıllardır halının altına süpürüyormuş. Eski çalışanlar konuştu.", "Magazin Ekspres özel: {company} patronu {founder} hakkında şok iddialar."],
+  },
+  fake_reviews: {
+    author: "watchdog",
+    rep: -2,
+    texts: ["Son günlerde {company} ürünleri hakkında yüzlerce olumsuz yorum var. Ne oluyor?", "Kullanıcılar {company} bilgisayarlarından şikâyetçi. Yorumlar bir felaket."],
+  },
+  op_caught: {
+    author: "business",
+    rep: 0, // ceza ayrıca uygulanır
+    texts: ["Skandal: {company}, rakibi {target} şirketine karşı gizli operasyon yürütürken yakalandı.", "Piyasa Kulisi: {company} ile {target} arasında casusluk krizi. Deliller {company} şirketini gösteriyor."],
+  },
   facility: {
     author: "news",
     rep: 2,

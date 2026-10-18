@@ -30,6 +30,9 @@ export type CompanyRow = {
   facility_level?: number;
   facility_target?: number | null;
   facility_ready_at?: string | null;
+  shares_total?: number;
+  founder_shares?: number;
+  ipo_at?: string | null;
 };
 
 /** Tesise yapılan yatırımın net değere katkısı (inşaatı süren seviye dahil: bedeli ödendi). */
@@ -94,6 +97,12 @@ export async function loadCompany(
   ]);
   const row = company as CompanyRow;
   row._extra = extraWorth(bank[0], status.map((s) => s.price)) + facilityWorth(row);
+  // Elindeki oyuncu şirket hisseleri (011)
+  const ph = await optional<{ shares: number }>(db().from("player_holdings").select("shares").eq("holder", row.id));
+  if (ph.length) {
+    const { holdingsValueOf } = await import("./equity");
+    row._extra += await holdingsValueOf(row.id);
+  }
   row._staff = staff.map((s) => s.role);
   row._cap = row._staff.includes("muhasebeci") ? ACCOUNTANT_CAP_HOURS : OFFLINE_CAP_HOURS;
   return { company: row, owned, holdings };
@@ -160,6 +169,8 @@ export function view(company: CompanyRow, owned: Owned, holdings: Holdings) {
     extraWorth: company._extra ?? 0,
     portfolioValue: portfolioValue(holdings, prices),
     netWorth: companyNetWorth(company.cash, owned, holdings, prices, company._extra ?? 0),
+    ownership: Number(company.founder_shares ?? 1000) / Number(company.shares_total ?? 1000),
+    ipo: company.ipo_at ?? null,
     serverTime: now,
   };
 }
