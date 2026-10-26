@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { formatCompactMoney, formatMoney } from "@/lib/game/economy";
 import { STATUS_GROUP, type StatusItem } from "@/lib/game/finance";
 import { apiFetch } from "@/lib/supabase/client";
+import { SkeletonCard } from "./Skeleton";
 
 type Item = StatusItem & { owned: boolean; resale: number };
 type Data = { ready: boolean; items: Item[] };
@@ -29,7 +30,7 @@ export function Properties({ cash, onState, notify }: { cash: number; onState: (
     }
   }
 
-  if (!d) return <div className="card p-4 text-sm text-mute">Katalog yükleniyor…</div>;
+  if (!d) return <SkeletonCard label="Katalog yükleniyor…" />;
   if (!d.ready) return <div className="card p-4 text-sm text-mute">Mülkler için veritabanında <code className="text-white">007_finans.sql</code> çalıştırılmalı.</div>;
   const groups = Object.keys(STATUS_GROUP) as StatusItem["group"][];
 

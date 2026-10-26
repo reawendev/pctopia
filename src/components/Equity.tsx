@@ -8,6 +8,7 @@ import { equityBuyTotal, equitySellTotal, ISSUE_FEE, issueProceeds } from "@/lib
 import type { LogoSpec } from "@/lib/game/config";
 import { formatPrice } from "@/lib/game/market";
 import { apiFetch } from "@/lib/supabase/client";
+import { SkeletonCard } from "./Skeleton";
 
 type Me = {
   ipo: string | null;
@@ -69,7 +70,7 @@ export function Equity({ cash, onState, notify }: { cash: number; onState: (s: a
     }
   }
 
-  if (!d) return <div className="card p-4 text-sm text-mute">Hisse defteri açılıyor…</div>;
+  if (!d) return <SkeletonCard label="Hisse defteri açılıyor…" />;
   if (!d.ready) return <div className="card p-4 text-sm text-mute">Halka arz için veritabanında <code className="text-white">011_halka_arz_operasyon.sql</code> çalıştırılmalı.</div>;
   const m = d.me;
   const k = Math.max(0, Math.trunc(Number(n) || 0));

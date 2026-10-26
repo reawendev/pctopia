@@ -76,10 +76,10 @@ export default function Home() {
       <section className="reveal" data-on={revealed ? "" : undefined}>
         <div className="mb-10 flex items-center gap-3" style={{ "--i": 0 } as React.CSSProperties}>
           <Logo spec={DEFAULT_LOGO} size={36} />
-          <span className="font-serif text-xl font-semibold">PCTopia</span>
+          <span className="font-display text-lg font-extrabold tracking-[0.06em]">PCTOPIA</span>
         </div>
 
-        <h1 className="heading max-w-xl text-4xl leading-[1.1] sm:text-5xl" style={{ "--i": 1 } as React.CSSProperties}>Bir garajda, ikinci el bir bilgisayarla başla.</h1>
+        <h1 className="max-w-xl font-display text-[28px] font-bold uppercase leading-[1.12] tracking-[0.01em] sm:text-4xl" style={{ "--i": 1 } as React.CSSProperties}>Bir garajda, ikinci el bir bilgisayarla başla.</h1>
         <p className="mt-5 max-w-lg text-lg leading-relaxed text-mute" style={{ "--i": 2 } as React.CSSProperties}>
           Şirketini kur, donanım parkını büyüt, borsada yatırım yap. Arkadaşlarınla aynı piyasada, sektörün zirvesi için yarış.
         </p>

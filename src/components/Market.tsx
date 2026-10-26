@@ -16,6 +16,7 @@ import {
   type Holdings,
 } from "@/lib/game/market";
 import { apiFetch } from "@/lib/supabase/client";
+import { SkeletonCard } from "./Skeleton";
 
 type Quote = { id: string; price: number; open24h: number; change24h: number; spark: number[] };
 type News = { tick: number; at: number; stockId: string; dir: 1 | -1; impact: number; text: string };
@@ -145,7 +146,7 @@ export function Market({
     }
   }
 
-  if (!data) return <div className="card p-4 text-sm text-mute">Piyasa verisi yükleniyor…</div>;
+  if (!data) return <SkeletonCard label="Piyasa verisi yükleniyor…" />;
 
   const mm = Math.floor(nextIn / 60000);
   const ss = Math.floor((nextIn % 60000) / 1000);

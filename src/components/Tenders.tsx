@@ -5,6 +5,7 @@ import { formatMoney } from "@/lib/game/economy";
 import { bondFor, tenderScore } from "@/lib/game/tenders";
 import { QUALITY_LABEL, SLOT_LABEL, SLOTS, type Parts } from "@/lib/game/workshop";
 import { apiFetch } from "@/lib/supabase/client";
+import { SkeletonCard } from "./Skeleton";
 
 type Tender = {
   id: string;
@@ -56,7 +57,7 @@ export function Tenders({ cash, reputation, now, onState, notify }: { cash: numb
     }
   }
 
-  if (!d) return <div className="card p-4 text-sm text-mute">İhale bülteni yükleniyor…</div>;
+  if (!d) return <SkeletonCard label="İhale bülteni yükleniyor…" />;
   if (!d.ready) return <div className="card p-4 text-sm text-mute">İhaleler için veritabanında <code className="text-white">009_ihale_arge.sql</code> çalıştırılmalı.</div>;
 
   return (
@@ -66,7 +67,7 @@ export function Tenders({ cash, reputation, now, onState, notify }: { cash: numb
         teklifin ${Math.round(tenderScore(100, reputation))} gibi değerlendirilir. Kazanırsan kapanışta depondan teslimat yapılır. Stoğun yetmezse teminatın yanar ve itibarın 6 düşer.
       </p>
       {d.open.length === 0 ? (
-        <div className="card p-4 text-sm text-mute">Şu an açık ihale yok. Yenisi en geç iki saat içinde yayımlanır.</div>
+        <SkeletonCard label="Şu an açık ihale yok. Yenisi en geç iki saat içinde yayımlanır." />
       ) : (
         d.open.map((t) => <OpenTender key={t.id} t={t} cash={cash} reputation={reputation} now={now} busy={busy} post={post} />)
       )}

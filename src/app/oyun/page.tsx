@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Appearance } from "@/components/Appearance";
 import { Club } from "@/components/Club";
@@ -27,7 +27,10 @@ import { apiFetch, supabaseBrowser } from "@/lib/supabase/client";
 import { ago } from "@/lib/time";
 import { useRequireSession } from "@/lib/useSession";
 import { Splash } from "@/components/Splash";
-import { direction, useSlidingIndicator } from "@/components/Motion";
+import { RollingNumber } from "@/components/RollingNumber";
+import { useToasts } from "@/components/Toaster";
+import { direction, useIsMobile, useSlidingIndicator, useSwipe } from "@/components/Motion";
+import { SkeletonCard, SkeletonLines } from "@/components/Skeleton";
 
 type Company = {
   id: string;
@@ -111,10 +114,53 @@ export default function Oyun() {
   const [world, setWorld] = useState<WorldData | null>(null);
   const [now, setNow] = useState(Date.now());
   const [skew, setSkew] = useState(0); // sunucu saati - istemci saati
-  const [busy, setBusy] = useState(false);
-  const [toast, setToast] = useState("");
+  const [bootError, setBootError] = useState("");
+  const { notify: setToast, node: toasts } = useToasts();
   const [board, setBoard] = useState<Board | null>(null);
   const [inbox, setInbox] = useState<InboxData | null>(null);
+  // Günlüğe yeni düşen kayıtlar kısa süre vurgulanır
+  const seenJournal = useRef<Set<number> | null>(null);
+  const [newJournal, setNewJournal] = useState<Set<number>>(new Set());
+  useEffect(() => {
+    if (!journal.length) return;
+    const seen = seenJournal.current;
+    seenJournal.current = new Set(journal.map((j) => j.id));
+    if (!seen) return; // ilk yükleme: vurgu yok
+    const fresh = journal.filter((j) => !seen.has(j.id)).map((j) => j.id);
+    if (!fresh.length) return;
+    setNewJournal(new Set(fresh));
+    const t = setTimeout(() => setNewJournal(new Set()), 900);
+    return () => clearTimeout(t);
+  }, [journal]);
+
+  // Sıralama: son bakıştan beri yükselen/düşen şirketler (tarayıcıda saklanan önceki sıralar)
+  const rankBase = useRef<Record<string, number> | null>(null);
+  // Karşılaştırma tabanı, liste ilk geldiği render'da okunur (kayıt efektte güncellenmeden önce)
+  if (board && !rankBase.current) {
+    try {
+      rankBase.current = JSON.parse(localStorage.getItem("pct-ranks") || "{}");
+    } catch {
+      rankBase.current = {};
+    }
+  }
+  useEffect(() => {
+    if (!board) return;
+    try {
+      localStorage.setItem("pct-ranks", JSON.stringify(Object.fromEntries(board.top.map((c) => [c.id, c.rank]))));
+    } catch {}
+  }, [board]);
+
+  // Telefonda sağa/sola kaydırarak sekme değiştir
+  const isMobile = useIsMobile();
+  const [mainEl, setMainEl] = useState<HTMLElement | null>(null);
+  const tabIdx = TAB_ORDER.indexOf(tab);
+  useSwipe(
+    mainEl,
+    () => tabIdx < TAB_ORDER.length - 1 && (go(TAB_ORDER[tabIdx + 1]), window.scrollTo({ top: 0 })),
+    () => tabIdx > 0 && (go(TAB_ORDER[tabIdx - 1]), window.scrollTo({ top: 0 })),
+    isMobile
+  );
+
   const deskInd = useSlidingIndicator(tab);
   const mobInd = useSlidingIndicator(tab);
 
@@ -156,7 +202,7 @@ export default function Oyun() {
   }, [load]);
 
   useEffect(() => {
-    if (ready) load().catch((e) => setToast(e.message));
+    if (ready) load().catch((e) => setBootError(e.message));
   }, [ready, load]);
 
   // Profil sayfasından gelen bağlantılar: ?sekme=finans&anlasma=<şirket>
@@ -207,28 +253,32 @@ export default function Oyun() {
     return () => clearInterval(t);
   }, [showBoard, ready]);
 
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(""), 3500);
-    return () => clearTimeout(t);
-  }, [toast]);
 
   const pending = useMemo(() => {
     if (!state) return 0;
     return pendingIncome(state.owned, new Date(state.company.lastCollectedAt).getTime(), now + skew, state.capHours ?? OFFLINE_CAP_HOURS);
   }, [state, now, skew]);
 
-  async function act(path: string, body?: object, okMsg?: (r: any) => string) {
-    setBusy(true);
-    try {
-      const r = await apiFetch(path, { method: "POST", body: JSON.stringify(body ?? {}) });
-      apply(r);
-      if (okMsg) setToast(okMsg(r));
-    } catch (e: any) {
-      setToast(e.message);
-    } finally {
-      setBusy(false);
-    }
+  // İyimser işlemler: ekran hemen güncellenir, istekler sırayla gider.
+  // Kuyruktaki son istek dönünce sunucunun gerçek durumu uygulanır; hata olursa durum sunucudan yeniden okunur.
+  const queue = useRef<Promise<void>>(Promise.resolve());
+  const inflight = useRef(0);
+  function act(path: string, body: object | undefined, okMsg: ((r: any) => string) | undefined, optimistic?: (s: State, at: number) => State) {
+    if (optimistic) setState((s) => (s ? optimistic(s, Date.now() + skew) : s));
+    inflight.current++;
+    queue.current = queue.current.then(async () => {
+      try {
+        const r = await apiFetch(path, { method: "POST", body: JSON.stringify(body ?? {}) });
+        inflight.current--;
+        if (inflight.current === 0) apply(r);
+        else if (Array.isArray(r.journal)) setJournal(r.journal);
+        if (okMsg) setToast(okMsg(r));
+      } catch (e: any) {
+        inflight.current--;
+        setToast(e.message);
+        await load().catch(() => {});
+      }
+    });
   }
 
   async function logout() {
@@ -237,7 +287,7 @@ export default function Oyun() {
   }
 
   // Perde her iki dalda da Fragment'in ilk çocuğu: React aynı örneği korur, kapanış animasyonu oyunun üstünde oynar
-  const splash = <Splash key="splash" done={ready && !!state} error={!state ? toast || undefined : undefined} />;
+  const splash = <Splash key="splash" done={ready && !!state} error={!state ? bootError || undefined : undefined} />;
   if (!ready || !state) return <>{splash}</>;
 
   const { company, owned } = state;
@@ -258,7 +308,7 @@ export default function Oyun() {
     {splash}
     <div className="pb-24 lg:pb-10">
       {/* Sabit üst bar */}
-      <header className="sticky top-0 z-20 border-b border-line bg-ink/95 backdrop-blur">
+      <header className="sticky top-[env(safe-area-inset-top)] z-20 border-b border-line bg-ink/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-2">
           <div className="shrink-0 overflow-hidden rounded-sm border border-amber/50">
             <Portrait spec={company.character} url={company.portraitUrl} size={36} />
@@ -276,7 +326,7 @@ export default function Oyun() {
           <dl className="num flex shrink-0 items-center gap-4 text-right">
             <div className="hidden sm:block">
               <dt className="text-[11px] text-mute">Net değer</dt>
-              <dd className="text-sm">{formatCompactMoney(state.netWorth)}</dd>
+              <dd className="text-sm"><RollingNumber value={state.netWorth} format={formatCompactMoney} flash /></dd>
             </div>
             <div className="hidden sm:block">
               <dt className="text-[11px] text-mute">İtibar</dt>
@@ -284,7 +334,7 @@ export default function Oyun() {
             </div>
             <div>
               <dt className="text-[11px] text-mute">Kasa</dt>
-              <dd className="text-sm font-semibold text-amber">{formatMoney(company.cash)}</dd>
+              <dd className="text-sm font-semibold text-amber"><RollingNumber value={company.cash} format={formatMoney} flash delta /></dd>
             </div>
           </dl>
         </div>
@@ -309,17 +359,17 @@ export default function Oyun() {
       </header>
       <Ticker eventTitle={world?.event.id !== "calm" ? world?.event.title : undefined} />
 
-      <main className="mx-auto max-w-6xl px-4 pt-4">
+      <main ref={setMainEl} className="mx-auto max-w-6xl px-4 pt-4">
         {/* Sekme değişince yeniden bağlanır ve sekme yönünden kayarak girer */}
         <div key={tab} className="page-enter" data-dir={dir}>
         {tab === "ofis" && (
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_340px]">
-            <div className="space-y-3">
+            <div className="stagger space-y-3">
               {world && <WorldCard w={world} now={serverNow} />}
               <section className="card flex flex-wrap items-center gap-x-6 gap-y-3 p-4">
                 <div className="min-w-0 flex-1">
                   <div className="text-xs text-mute">Muhasebe: tahsil edilmeyi bekleyen</div>
-                  <div className="num text-3xl font-semibold text-gain">{formatMoney(pending)}</div>
+                  <div className="text-3xl font-semibold text-gain"><RollingNumber value={pending} format={formatMoney} duration={500} /></div>
                   <div className="text-xs text-mute">
                     {rate === 0
                       ? "Gelir getiren bir donanımın yok. Üretim sekmesinden ilk makineni al."
@@ -330,7 +380,17 @@ export default function Oyun() {
                       : `Saatte ${formatMoney(rate)}, en fazla ${cap} saat birikir.`}
                   </div>
                 </div>
-                <button className="btn btn-primary" disabled={busy || pending <= 0} onClick={() => act("/api/company/collect", {}, (r) => `Tahsilat yapıldı: ${formatMoney(r.collected)}`)}>
+                <button
+                  className="btn btn-primary press"
+                  disabled={pending <= 0}
+                  onClick={() =>
+                    act("/api/company/collect", {}, (r) => `Tahsilat yapıldı: ${formatMoney(r.collected)}`, (s, at) => ({
+                      ...s,
+                      company: { ...s.company, cash: s.company.cash + pending, lastCollectedAt: new Date(at).toISOString() },
+                      netWorth: s.netWorth + pending,
+                    }))
+                  }
+                >
                   Tahsilat yap
                 </button>
               </section>
@@ -345,9 +405,9 @@ export default function Oyun() {
               )}
 
               <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-md border border-line bg-line sm:grid-cols-4">
-                <Figure label="Saatlik gelir" value={formatMoney(rate)} />
-                <Figure label="Portföy" value={formatCompactMoney(state.portfolioValue ?? 0)} />
-                <Figure label="Net değer" value={formatCompactMoney(state.netWorth)} />
+                <Figure label="Saatlik gelir" value={<RollingNumber value={rate} format={formatMoney} flash />} />
+                <Figure label="Portföy" value={<RollingNumber value={state.portfolioValue ?? 0} format={formatCompactMoney} flash />} />
+                <Figure label="Net değer" value={<RollingNumber value={state.netWorth} format={formatCompactMoney} flash />} />
                 <Figure label="İtibar" value={`${rep} / 100`} tone={repTone(rep)} />
               </dl>
 
@@ -399,7 +459,7 @@ export default function Oyun() {
               ) : (
                 <ol className="max-h-[560px] divide-y divide-line overflow-y-auto">
                   {journal.map((j) => (
-                    <li key={j.id} className="flex gap-2.5 px-4 py-2">
+                    <li key={j.id} className={`flex gap-2.5 px-4 py-2 ${newJournal.has(j.id) ? "row-new" : ""}`}>
                       <span
                         className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${
                           j.kind === "founded" ? "bg-amber" : j.kind === "life" ? "bg-[#C98BC9]" : j.amount && j.amount > 0 ? "bg-gain" : j.amount && j.amount < 0 ? "bg-loss" : "bg-mute"
@@ -422,7 +482,7 @@ export default function Oyun() {
             <Segmented value={sub.uretim} options={URETIM_OPTS} onChange={(v) => goSub("uretim", v as any, keysOf(URETIM_OPTS))} />
             <div key={sub.uretim} className="page-enter-soft" data-dir={subDir}>
             {sub.uretim === "donanim" ? (
-              <ul className="card divide-y divide-line">
+              <ul className="card stagger divide-y divide-line">
                 {EQUIPMENT.map((e) => {
                   const qty = owned[e.id] ?? 0;
                   const cost = unitCost(e.id, qty);
@@ -440,9 +500,16 @@ export default function Oyun() {
                       </div>
                       <span className="num hidden shrink-0 text-sm text-gain sm:block">saatte +{formatMoney(e.incomePerHour)}</span>
                       <button
-                        className="btn btn-primary shrink-0 !px-3 !py-2"
-                        disabled={busy || locked || company.cash < cost}
-                        onClick={() => act("/api/company/buy", { equipmentId: e.id }, () => `${e.name} satın alındı`)}
+                        className="btn btn-primary press min-h-[44px] shrink-0 !px-3 !py-2"
+                        disabled={locked || company.cash + pending < cost}
+                        onClick={() =>
+                          act("/api/company/buy", { equipmentId: e.id }, () => `${e.name} satın alındı`, (s, at) => ({
+                            ...s,
+                            // Sunucu da önce birikmiş geliri kasaya geçirir, sonra bedeli düşer
+                            company: { ...s.company, cash: s.company.cash + pending - cost, lastCollectedAt: new Date(at).toISOString() },
+                            owned: { ...s.owned, [e.id]: (s.owned[e.id] ?? 0) + 1 },
+                          }))
+                        }
                         aria-label={`${e.name} satın al, ${formatMoney(cost)}`}
                       >
                         <span className="num">{formatCompactMoney(cost)}</span>
@@ -488,7 +555,7 @@ export default function Oyun() {
             <Segmented value={sub.gundem} options={GUNDEM_OPTS} onChange={(v) => goSub("gundem", v as any, keysOf(GUNDEM_OPTS))} />
             <div key={sub.gundem} className="page-enter-soft" data-dir={subDir}>
             {sub.gundem === "seref" ? (
-              world ? <HallOfFame w={world} /> : <div className="card p-4 text-sm text-mute">Yükleniyor…</div>
+              world ? <HallOfFame w={world} /> : <SkeletonCard label="Yükleniyor…" />
             ) : sub.gundem === "akis" ? (
               <Feed now={serverNow} />
             ) : (
@@ -498,12 +565,13 @@ export default function Oyun() {
                   {board && <span className="text-sm text-mute">{board.me ? `Sıran: ${board.me.rank} / ${board.total}` : `${board.total} şirket`}</span>}
                 </div>
                 {!board ? (
-                  <p className="px-4 py-3 text-sm text-mute">Liste hazırlanıyor…</p>
+                  <SkeletonLines label="Liste hazırlanıyor…" rows={6} />
                 ) : (
-                  <ol className="divide-y divide-line">
+                  <ol className="stagger divide-y divide-line">
                     {board.top.map((c) => (
                       <li key={c.id} className={`flex items-center gap-3 px-4 py-2.5 ${c.isMe ? "bg-amber/[0.06]" : ""}`}>
                         <span className={`num w-6 text-right font-serif ${c.rank <= 3 ? "text-amber" : "text-mute"}`}>{c.rank}</span>
+                        <RankMove move={rankBase.current?.[c.id] ? rankBase.current[c.id] - c.rank : 0} />
                         <CompanyMark spec={c.logo} url={c.logoUrl} size={28} title={c.name} />
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-sm font-medium">
@@ -566,11 +634,7 @@ export default function Oyun() {
         ))}
       </nav>
 
-      {toast && (
-        <div className="fixed inset-x-0 bottom-20 z-30 mx-auto w-fit max-w-[90vw] rounded border border-amber/40 bg-raised px-4 py-2.5 text-sm shadow-lg lg:bottom-6" role="status">
-          {toast}
-        </div>
-      )}
+      {toasts}
     </div>
     </>
   );
@@ -596,7 +660,7 @@ function Segmented({ value, options, onChange }: { value: string; options: [stri
           role="tab"
           aria-selected={value === k}
           onClick={() => onChange(k)}
-          className={`tab-label relative shrink-0 whitespace-nowrap rounded px-3 py-1.5 ${value === k ? "text-white" : "text-mute hover:text-white"}`}
+          className={`tab-label relative shrink-0 whitespace-nowrap rounded px-3.5 py-2 lg:px-3 lg:py-1.5 ${value === k ? "text-white" : "text-mute hover:text-white"}`}
         >
           {label}
         </button>
@@ -605,7 +669,18 @@ function Segmented({ value, options, onChange }: { value: string; options: [stri
   );
 }
 
-function Figure({ label, value, tone }: { label: string; value: string; tone?: string }) {
+function RankMove({ move }: { move: number }) {
+  if (!move) return <span className="w-7" aria-hidden />;
+  const up = move > 0;
+  return (
+    <span className={`num w-7 text-[11px] font-medium ${up ? "text-gain" : "text-loss"}`} aria-label={`${Math.abs(move)} sıra ${up ? "yükseldi" : "düştü"}`}>
+      {up ? "▲" : "▼"}
+      {Math.abs(move)}
+    </span>
+  );
+}
+
+function Figure({ label, value, tone }: { label: string; value: React.ReactNode; tone?: string }) {
   return (
     <div className="bg-panel px-4 py-2.5">
       <dt className="text-xs text-mute">{label}</dt>

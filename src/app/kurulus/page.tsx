@@ -109,7 +109,7 @@ export default function Kurulus() {
     {splash}
     <main className="mx-auto max-w-5xl px-4 py-8 sm:py-12">
       <header className="mb-8 max-w-2xl">
-        <h1 className="heading text-3xl sm:text-4xl">Şirket tescili</h1>
+        <h1 className="font-display text-2xl font-bold uppercase tracking-[0.02em] sm:text-3xl">Şirket tescili</h1>
         <p className="mt-3 leading-relaxed text-mute">
           Elinde {formatMoney(START_CASH)} birikim ve bir garaj var. Önce kendini tanıt, sonra şirketine bir isim ve arma seç. Tescilden sonra
           bunlar değiştirilemez.

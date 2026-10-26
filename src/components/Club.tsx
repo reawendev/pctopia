@@ -5,6 +5,7 @@ import { DICE_LABEL, DICE_PAYOUT, MIN_BET, RANKS, RED, ROULETTE_LABEL, SUITS, ty
 import { formatMoney } from "@/lib/game/economy";
 import { formatPrice, STOCK_BY_ID } from "@/lib/game/market";
 import { apiFetch } from "@/lib/supabase/client";
+import { SkeletonCard } from "./Skeleton";
 
 type Hand = { bet: number; player: Card[]; dealer: Card[]; playerTotal: number; dealerTotal: number; canDouble: boolean };
 type Quote = { id: string; price: number; odds: { minutes: number; up: number; down: number }[] };
@@ -73,7 +74,7 @@ export function Club({ cash, now, onState, notify }: { cash: number; now: number
     [onState, notify]
   );
 
-  if (!d) return <div className="card p-4 text-sm text-mute">Kulübün kapısı açılıyor…</div>;
+  if (!d) return <SkeletonCard label="Kulübün kapısı açılıyor…" />;
   if (!d.ready) return <div className="card p-4 text-sm text-mute">Kulüp için veritabanında <code className="text-white">012_kulup_bahis.sql</code> çalıştırılmalı.</div>;
 
   return (
@@ -369,11 +370,11 @@ function MarketBets({ quotes, bets, cash, max, busy, play, now }: { quotes: Quot
 // ---------------- Bahis bürosu ----------------
 
 function Pools({ pools, cash, max, busy, play, now }: { pools: Data["pools"]; cash: number; max: number; busy: boolean; play: Play; now: number }) {
-  if (!pools.ready) return <div className="card p-4 text-sm text-mute">Bahis bürosu kapalı.</div>;
+  if (!pools.ready) return <SkeletonCard label="Bahis bürosu kapalı." />;
   return (
     <div className="space-y-3">
       <p className="text-sm text-mute">Bahisler ortak havuzda toplanır. Sonuç belli olunca büro %5'ini alır, kalanı bilenler yatırdıkları oranda paylaşır. Kimse bilemezse herkese iade edilir.</p>
-      {pools.open.length === 0 && <div className="card p-4 text-sm text-mute">Şu an açık bahis yok.</div>}
+      {pools.open.length === 0 && <SkeletonCard label="Şu an açık bahis yok." />}
       {pools.open.map((p) => (
         <PoolCard key={p.id} p={p} cash={cash} max={max} busy={busy} play={play} now={now} />
       ))}

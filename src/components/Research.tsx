@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { formatMoney } from "@/lib/game/economy";
 import { effectText, PATENT_HOURS, TECH_BY_ID, type Tech } from "@/lib/game/research";
 import { apiFetch } from "@/lib/supabase/client";
+import { SkeletonCard } from "./Skeleton";
 
 type Row = Tech & {
   status: "locked" | "available" | "running" | "waiting" | "active";
@@ -46,7 +47,7 @@ export function Research({ cash, now, onState, notify }: { cash: number; now: nu
     }
   }
 
-  if (!d) return <div className="card p-4 text-sm text-mute">Ar-Ge dosyaları açılıyor…</div>;
+  if (!d) return <SkeletonCard label="Ar-Ge dosyaları açılıyor…" />;
   if (!d.ready) return <div className="card p-4 text-sm text-mute">Ar-Ge için veritabanında <code className="text-white">009_ihale_arge.sql</code> çalıştırılmalı.</div>;
   const total = effectText(d.effects);
 

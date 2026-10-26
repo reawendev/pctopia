@@ -7,6 +7,7 @@ import {
   ACTIVITIES, PERK_BASE, PERK_TEXT, PROPOSE_MIN, proposalChance, stageRank, STAGE_LABEL, type Npc, type Perk, type StageId,
 } from "@/lib/game/life";
 import { apiFetch } from "@/lib/supabase/client";
+import { SkeletonCard } from "./Skeleton";
 
 type Person = {
   npc: Npc;
@@ -70,7 +71,7 @@ export function Life({ cash, now, onState, notify }: { cash: number; now: number
     }
   }
 
-  if (!data) return <div className="card p-4 text-sm text-mute">Ajandan açılıyor…</div>;
+  if (!data) return <SkeletonCard label="Ajandan açılıyor…" />;
   if (!data.ready) return <div className="card p-4 text-sm text-mute">Hayat için veritabanında <code className="text-white">005_atolye_sosyal_hayat.sql</code> çalıştırılmalı.</div>;
 
   const t = now; // sayfadan gelen, sunucu saatine göre düzeltilmiş an

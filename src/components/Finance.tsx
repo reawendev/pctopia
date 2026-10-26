@@ -9,6 +9,7 @@ import { formatMoney } from "@/lib/game/economy";
 import { DEAL_LABEL, LOAN_TERMS, loanAtMaturity, type DealKind, type Role } from "@/lib/game/finance";
 import { apiFetch } from "@/lib/supabase/client";
 import { ago } from "@/lib/time";
+import { SkeletonCard } from "./Skeleton";
 
 type Notify = (m: string) => void;
 type OnState = (s: any) => void;
@@ -97,7 +98,7 @@ function Bank({ cash, now, onState, notify }: { cash: number; now: number; onSta
     apiFetch<BankData>("/api/bank").then(setD).catch((e) => notify(e.message));
   }, [notify]);
   const { busy, post } = usePost<BankData>("/api/bank", setD, onState, notify);
-  if (!d) return <div className="card p-4 text-sm text-mute">Banka açılıyor…</div>;
+  if (!d) return <SkeletonCard label="Banka açılıyor…" />;
   if (!d.ready) return <div className="card p-4 text-sm text-mute">Banka için veritabanında <code className="text-white">007_finans.sql</code> çalıştırılmalı.</div>;
   const a = Number(amount) || 0;
   const b = Number(dep) || 0;
@@ -175,7 +176,7 @@ function Staff({ cash, onState, notify }: { cash: number; onState: OnState; noti
     apiFetch<StaffData>("/api/staff").then(setD).catch((e) => notify(e.message));
   }, [notify]);
   const { busy, post } = usePost<StaffData>("/api/staff", setD, onState, notify);
-  if (!d) return <div className="card p-4 text-sm text-mute">Kadro yükleniyor…</div>;
+  if (!d) return <SkeletonCard label="Kadro yükleniyor…" />;
   if (!d.ready) return <div className="card p-4 text-sm text-mute">Çalışanlar için veritabanında <code className="text-white">007_finans.sql</code> çalıştırılmalı.</div>;
   const total = d.roles.filter((r) => r.hired).reduce((s, r) => s + r.salary, 0);
   return (
@@ -249,7 +250,7 @@ function Deals({ cash, now, onState, notify, initialTo }: { cash: number; now: n
     load();
   }, [load]);
   const { busy, post } = usePost<DealsData>("/api/deals", setD, onState, notify);
-  if (!d) return <div className="card p-4 text-sm text-mute">Anlaşmalar yükleniyor…</div>;
+  if (!d) return <SkeletonCard label="Anlaşmalar yükleniyor…" />;
   if (!d.ready) return <div className="card p-4 text-sm text-mute">Anlaşmalar için veritabanında <code className="text-white">007_finans.sql</code> çalıştırılmalı.</div>;
 
   const row = (x: Deal, mine: boolean) => {

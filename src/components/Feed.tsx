@@ -6,6 +6,7 @@ import { CompanyMark, Portrait } from "./Portrait";
 import type { CharacterSpec, LogoSpec } from "@/lib/game/config";
 import { apiFetch } from "@/lib/supabase/client";
 import { ago } from "@/lib/time";
+import { SkeletonLines } from "./Skeleton";
 
 type Co = { id: string; name: string; founderName: string; logo: LogoSpec | null; logoUrl: string | null; portraitUrl: string | null; character: CharacterSpec | null };
 type Comment = { id: number; text: string; at: string; company: Co; canDelete: boolean };
@@ -109,7 +110,7 @@ export function Feed({ now, scope: fixedScope, companyId, compact }: { now: numb
       {msg && <p className="px-4 pt-3 text-sm text-loss">{msg}</p>}
 
       {!data ? (
-        <p className="px-4 py-4 text-sm text-mute">Akış yükleniyor…</p>
+        <SkeletonLines label="Akış yükleniyor…" rows={5} />
       ) : data.posts.length === 0 ? (
         <p className="px-4 py-4 text-sm text-mute">
           {fixedScope ? "Bu şirket hakkında henüz paylaşım yok." : scope === "me" ? "Henüz hakkında paylaşım yok." : "Akış sessiz. İlk paylaşımı sen yap."}

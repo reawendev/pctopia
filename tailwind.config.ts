@@ -3,6 +3,8 @@ import type { Config } from "tailwindcss";
 // "Yönetim katı" paleti: lake lacivert, pirinç, fildişi.
 const config: Config = {
   content: ["./src/**/*.{ts,tsx}"],
+  // Dokunmatik ekranda hover renkleri "takılı" kalmasın
+  future: { hoverOnlyWhenSupported: true },
   theme: {
     extend: {
       colors: {
@@ -17,9 +19,11 @@ const config: Config = {
         loss: "#D46A5A", // mühür kırmızısı
       },
       fontFamily: {
-        sans: ['"IBM Plex Sans"', "ui-sans-serif", "system-ui", "sans-serif"],
+        sans: ['"Geist Variable"', "ui-sans-serif", "system-ui", "sans-serif"],
+        // Logo ve giriş başlıkları. Akira Expanded lisansı alınırsa globals.css'teki @font-face açılır ve öne geçer.
+        display: ['"Akira Expanded"', '"Unbounded Variable"', "ui-sans-serif", "system-ui", "sans-serif"],
         serif: ['"IBM Plex Serif"', "Georgia", "serif"],
-        mono: ['"IBM Plex Sans"', "ui-sans-serif", "system-ui", "sans-serif"],
+        mono: ['"Geist Variable"', "ui-sans-serif", "system-ui", "sans-serif"],
       },
     },
   },

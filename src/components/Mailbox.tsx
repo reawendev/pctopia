@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CompanyMark } from "./Portrait";
+import { useIsMobile } from "./Motion";
+import { Sheet } from "./Sheet";
 import type { LogoSpec } from "@/lib/game/config";
 import { formatMoney } from "@/lib/game/economy";
 import { apiFetch } from "@/lib/supabase/client";
 import { ago } from "@/lib/time";
+import { SkeletonCard } from "./Skeleton";
 
 export type OfferChoice = { id: string; label: string; cost: number; minutes: number; p: number; win: number; lose: number; decline: boolean; winNote?: string; loseNote?: string };
 export type Offer = {
@@ -102,7 +105,7 @@ export function Mailbox({
   useEffect(() => {
     setAllRead(false);
   }, [data]);
-  const paneRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
 
   const items: Item[] = useMemo(() => {
     if (!data) return [];
@@ -112,11 +115,6 @@ export function Mailbox({
     ];
     return list.sort((a, b) => b.at - a.at);
   }, [data]);
-
-  // Dar ekranda seçim yapılınca okuma bölmesine kaydır
-  useEffect(() => {
-    if (sel && window.matchMedia("(max-width: 1023px)").matches) paneRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [sel]);
 
   async function open(kind: "offer" | "message", id: string, read: boolean) {
     setSel({ kind, id });
@@ -158,7 +156,7 @@ export function Mailbox({
     }
   }
 
-  if (!data) return <div className="card p-5 text-sm text-mute">Posta kutusu açılıyor…</div>;
+  if (!data) return <SkeletonCard label="Posta kutusu açılıyor…" />;
   if (!data.ready) {
     return (
       <div className="card p-5 text-sm text-mute">
@@ -172,6 +170,59 @@ export function Mailbox({
   const selectedOffer = sel?.kind === "offer" ? data.offers.find((o) => o.id === sel.id) : undefined;
   const selectedMsg = sel?.kind === "message" ? data.inbox.find((m) => m.id === sel.id) : sel?.kind === "sent" ? data.sent.find((m) => m.id === sel.id) : undefined;
 
+  const hasPane = sel?.kind === "compose" || !!selectedOffer || !!selectedMsg;
+  const pane = sel?.kind === "compose" ? (
+          <Compose
+            initialTo={sel.to}
+            initialSubject={sel.subject}
+            onSent={async (to) => {
+              notify(`Posta ${to} şirketine gönderildi.`);
+              setFolder("giden");
+              setSel(null);
+              await reload();
+            }}
+            onCancel={() => setSel(null)}
+            notify={notify}
+          />
+        ) : selectedOffer ? (
+          <OfferPane o={selectedOffer} now={now} cash={cash} busy={busy} onChoose={(c) => respond(selectedOffer, c)} />
+        ) : selectedMsg ? (
+          <article className="card p-5">
+            <div className="flex items-center gap-3 border-b border-line pb-4">
+              {(sel?.kind === "sent" ? selectedMsg.to.logo : selectedMsg.from.logo) && (
+                <CompanyMark
+                  spec={(sel?.kind === "sent" ? selectedMsg.to.logo : selectedMsg.from.logo)!}
+                  url={sel?.kind === "sent" ? selectedMsg.to.logoUrl : selectedMsg.from.logoUrl}
+                  size={36}
+                />
+              )}
+              <div className="min-w-0">
+                <div className="truncate text-sm text-mute">
+                  {sel?.kind === "sent" ? "Kime: " : `${selectedMsg.from.founderName}, `}
+                  <Link href={`/sirket/${(sel?.kind === "sent" ? selectedMsg.to : selectedMsg.from).id}`} className="hover:text-amber">
+                    {(sel?.kind === "sent" ? selectedMsg.to : selectedMsg.from).name}
+                  </Link>
+                </div>
+                <h2 className="heading text-xl">{selectedMsg.subject}</h2>
+              </div>
+            </div>
+            <p className="mt-4 whitespace-pre-wrap break-words leading-relaxed">{selectedMsg.body}</p>
+            <div className="mt-5 flex items-center justify-between text-sm text-mute">
+              <span>{new Date(selectedMsg.createdAt).toLocaleString("tr-TR", { dateStyle: "medium", timeStyle: "short" })}</span>
+              {sel?.kind === "message" && (
+                <button
+                  className="btn"
+                  onClick={() =>
+                    setSel({ kind: "compose", to: selectedMsg.from.id, subject: selectedMsg.subject.startsWith("Ynt: ") ? selectedMsg.subject : `Ynt: ${selectedMsg.subject}` })
+                  }
+                >
+                  Yanıtla
+                </button>
+              )}
+            </div>
+          </article>
+        ) : null;
+
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
       {/* Liste */}
@@ -182,7 +233,7 @@ export function Mailbox({
               key={f}
               onClick={() => setFolder(f)}
               aria-pressed={folder === f}
-              className={`rounded px-3 py-1.5 text-sm ${folder === f ? "bg-raised text-white" : "text-mute hover:text-white"}`}
+              className={`rounded px-3 py-2 text-sm lg:py-1.5 ${folder === f ? "bg-raised text-white" : "text-mute hover:text-white"}`}
             >
               {f === "gelen" ? "Gelen kutusu" : "Gönderilenler"}
             </button>
@@ -195,7 +246,7 @@ export function Mailbox({
         {folder === "gelen" && (unreadCount > 0 || marking) && (
           <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-2 text-xs">
             <span className="num text-mute">{unreadCount > 0 ? `${unreadCount} okunmamış` : "Hepsi okundu"}</span>
-            <button className="text-amber transition-colors hover:text-amber-soft disabled:opacity-50" disabled={marking} onClick={markAllRead}>
+            <button className="-my-1.5 py-1.5 text-amber transition-colors hover:text-amber-soft disabled:opacity-50" disabled={marking} onClick={markAllRead}>
               Tümünü okundu olarak işaretle
             </button>
           </div>
@@ -267,62 +318,14 @@ export function Mailbox({
         )}
       </section>
 
-      {/* Okuma bölmesi */}
-      <div ref={paneRef} className="scroll-mt-20 lg:sticky lg:top-28 lg:self-start">
-        {sel?.kind === "compose" ? (
-          <Compose
-            initialTo={sel.to}
-            initialSubject={sel.subject}
-            onSent={async (to) => {
-              notify(`Posta ${to} şirketine gönderildi.`);
-              setFolder("giden");
-              setSel(null);
-              await reload();
-            }}
-            onCancel={() => setSel(null)}
-            notify={notify}
-          />
-        ) : selectedOffer ? (
-          <OfferPane o={selectedOffer} now={now} cash={cash} busy={busy} onChoose={(c) => respond(selectedOffer, c)} />
-        ) : selectedMsg ? (
-          <article className="card p-5">
-            <div className="flex items-center gap-3 border-b border-line pb-4">
-              {(sel?.kind === "sent" ? selectedMsg.to.logo : selectedMsg.from.logo) && (
-                <CompanyMark
-                  spec={(sel?.kind === "sent" ? selectedMsg.to.logo : selectedMsg.from.logo)!}
-                  url={sel?.kind === "sent" ? selectedMsg.to.logoUrl : selectedMsg.from.logoUrl}
-                  size={36}
-                />
-              )}
-              <div className="min-w-0">
-                <div className="truncate text-sm text-mute">
-                  {sel?.kind === "sent" ? "Kime: " : `${selectedMsg.from.founderName}, `}
-                  <Link href={`/sirket/${(sel?.kind === "sent" ? selectedMsg.to : selectedMsg.from).id}`} className="hover:text-amber">
-                    {(sel?.kind === "sent" ? selectedMsg.to : selectedMsg.from).name}
-                  </Link>
-                </div>
-                <h2 className="heading text-xl">{selectedMsg.subject}</h2>
-              </div>
-            </div>
-            <p className="mt-4 whitespace-pre-wrap break-words leading-relaxed">{selectedMsg.body}</p>
-            <div className="mt-5 flex items-center justify-between text-sm text-mute">
-              <span>{new Date(selectedMsg.createdAt).toLocaleString("tr-TR", { dateStyle: "medium", timeStyle: "short" })}</span>
-              {sel?.kind === "message" && (
-                <button
-                  className="btn"
-                  onClick={() =>
-                    setSel({ kind: "compose", to: selectedMsg.from.id, subject: selectedMsg.subject.startsWith("Ynt: ") ? selectedMsg.subject : `Ynt: ${selectedMsg.subject}` })
-                  }
-                >
-                  Yanıtla
-                </button>
-              )}
-            </div>
-          </article>
-        ) : (
-          <div className="card hidden p-8 text-center text-sm text-mute lg:block">Okumak için soldan bir posta seç.</div>
-        )}
-      </div>
+      {/* Okuma bölmesi: masaüstünde sağda, telefonda alttan açılan sayfa */}
+      {isMobile ? (
+        hasPane && <Sheet onClose={() => setSel(null)} label="Posta">{pane}</Sheet>
+      ) : (
+        <div className="lg:sticky lg:top-28 lg:self-start">
+          {hasPane ? <div key={sel && "id" in sel ? sel.id : sel?.kind} className="page-enter-soft">{pane}</div> : <div className="card p-8 text-center text-sm text-mute">Okumak için soldan bir posta seç.</div>}
+        </div>
+      )}
     </div>
   );
 }

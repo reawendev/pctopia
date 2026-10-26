@@ -11,6 +11,7 @@ import {
   SEGMENT_IDS, SEGMENTS, segmentId, SLOT_LABEL, SLOTS, unitCost, verdict, type Listing, type PartMult, type Parts, type PriceVerdict,
 } from "@/lib/game/workshop";
 import { apiFetch } from "@/lib/supabase/client";
+import { SkeletonCard } from "./Skeleton";
 
 type ModelView = {
   id: string;
@@ -119,7 +120,7 @@ export function Workshop({ cash, onState, notify }: { cash: number; stageLevel?:
     }
   }
 
-  if (!data) return <div className="card p-4 text-sm text-mute">Atölye açılıyor…</div>;
+  if (!data) return <SkeletonCard label="Atölye açılıyor…" />;
   if (!data.ready) return <div className="card p-4 text-sm text-mute">PC Atölyesi için veritabanında <code className="text-white">005_atolye_sosyal_hayat.sql</code> çalıştırılmalı.</div>;
 
   const ctx: Ctx = {
@@ -157,7 +158,7 @@ export function Workshop({ cash, onState, notify }: { cash: number; stageLevel?:
       {designing && <Designer ctx={ctx} busy={busy} onCreate={async (b) => (await act({ action: "create", ...b })) && setDesigning(false)} />}
 
       {data.models.length === 0 && !designing ? (
-        <div className="card p-4 text-sm text-mute">Henüz bir modelin yok. İlk toplama PC'ni tasarlayarak başla.</div>
+        <SkeletonCard label="Henüz bir modelin yok. İlk toplama PC'ni tasarlayarak başla." />
       ) : (
         <ul className="space-y-3">
           {data.models.map((m) => (
