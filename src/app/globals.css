@@ -288,6 +288,103 @@ textarea {
   transition-delay: 220ms;
 }
 
+/* ---------- Sekme geçişleri (iOS gezinme eğrisi) ---------- */
+/* Yön: data-dir="1" ileri (sağdan gelir), "-1" geri (soldan gelir) */
+.page-enter {
+  animation: page-in 480ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+.page-enter[data-dir="-1"] {
+  animation-name: page-in-back;
+}
+/* Alt sekmeler: daha kısa yol, aynı eğri */
+.page-enter-soft {
+  animation: page-in-soft 380ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+.page-enter-soft[data-dir="-1"] {
+  animation-name: page-in-soft-back;
+}
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translate3d(28px, 0, 0) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes page-in-back {
+  from {
+    opacity: 0;
+    transform: translate3d(-28px, 0, 0) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes page-in-soft {
+  from {
+    opacity: 0;
+    transform: translate3d(14px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes page-in-soft-back {
+  from {
+    opacity: 0;
+    transform: translate3d(-14px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Kayan sekme göstergesi (alt çizgi / hap) */
+.tab-indicator {
+  position: absolute;
+  left: 0;
+  pointer-events: none;
+}
+.tab-indicator[data-animate] {
+  transition: transform 460ms cubic-bezier(0.32, 0.72, 0, 1), width 460ms cubic-bezier(0.32, 0.72, 0, 1), opacity 200ms ease;
+}
+/* Etiket rengi göstergeyle aynı anda değişsin */
+.tab-label {
+  transition: color 260ms ease;
+}
+
+/* Posta: "tümü okundu" sırasında okunmamış noktaları söner */
+.unread-dot {
+  transition: opacity 320ms ease, transform 320ms cubic-bezier(0.32, 0.72, 0, 1), background-color 320ms ease;
+}
+.unread-dot[data-off] {
+  opacity: 0;
+  transform: scale(0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter,
+  .page-enter[data-dir="-1"],
+  .page-enter-soft,
+  .page-enter-soft[data-dir="-1"] {
+    animation: splash-fade 200ms ease-out both;
+  }
+  .tab-indicator[data-animate] {
+    transition: opacity 200ms ease;
+  }
+  .unread-dot {
+    transition: opacity 200ms ease;
+  }
+  .unread-dot[data-off] {
+    transform: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .splash-curtain {
     transition: opacity 300ms ease;

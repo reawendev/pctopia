@@ -27,6 +27,7 @@ import { apiFetch, supabaseBrowser } from "@/lib/supabase/client";
 import { ago } from "@/lib/time";
 import { useRequireSession } from "@/lib/useSession";
 import { Splash } from "@/components/Splash";
+import { direction, useSlidingIndicator } from "@/components/Motion";
 
 type Company = {
   id: string;
@@ -71,6 +72,26 @@ const TABS: [Tab, string][] = [
   ["gundem", "Gündem"],
 ];
 
+const TAB_ORDER = TABS.map(([k]) => k);
+
+const URETIM_OPTS: [string, string][] = [
+  ["donanim", "Donanım"],
+  ["atolye", "PC Atölyesi"],
+  ["ihale", "İhaleler"],
+  ["arge", "Ar-Ge"],
+];
+const HAYAT_OPTS: [string, string][] = [
+  ["iliskiler", "İlişkiler"],
+  ["mulkler", "Mülkler"],
+  ["kulup", "Kulüp"],
+];
+const GUNDEM_OPTS: [string, string][] = [
+  ["akis", "Sosyal medya"],
+  ["siralama", "Sıralama"],
+  ["seref", "Şeref listesi"],
+];
+const keysOf = (o: [string, string][]) => o.map(([k]) => k);
+
 function repTone(r: number) {
   return r >= 65 ? "text-gain" : r < 40 ? "text-loss" : "text-white";
 }
@@ -82,6 +103,8 @@ export default function Oyun() {
   const [journal, setJournal] = useState<JournalEntry[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [tab, setTab] = useState<Tab>("ofis");
+  const [dir, setDir] = useState<1 | -1>(1);
+  const [subDir, setSubDir] = useState<1 | -1>(1);
   const [sub, setSub] = useState<{ uretim: "donanim" | "atolye" | "ihale" | "arge"; gundem: "akis" | "siralama" | "seref"; hayat: "iliskiler" | "mulkler" | "kulup" }>({ uretim: "donanim", gundem: "akis", hayat: "iliskiler" });
   const [dealTo, setDealTo] = useState<string | null>(null);
   const [mailTo, setMailTo] = useState<string | null>(null);
@@ -92,6 +115,21 @@ export default function Oyun() {
   const [toast, setToast] = useState("");
   const [board, setBoard] = useState<Board | null>(null);
   const [inbox, setInbox] = useState<InboxData | null>(null);
+  const deskInd = useSlidingIndicator(tab);
+  const mobInd = useSlidingIndicator(tab);
+
+  // Sekme değişimi: yön sekme sırasından gelir, içerik o yönden kayarak girer
+  function go(k: Tab) {
+    if (k === tab) return;
+    setDir(direction(TAB_ORDER, tab, k));
+    setTab(k);
+  }
+
+  function goSub<K extends keyof typeof sub>(key: K, v: (typeof sub)[K], order: readonly string[]) {
+    if (sub[key] === v) return;
+    setSubDir(direction(order, sub[key], v));
+    setSub((s) => ({ ...s, [key]: v }));
+  }
 
   const apply = useCallback((s: any) => {
     if (!s?.company) return;
@@ -251,13 +289,15 @@ export default function Oyun() {
           </dl>
         </div>
         {/* Masaüstü sekmeler */}
-        <nav className="mx-auto hidden max-w-6xl px-4 lg:flex" aria-label="Bölümler">
+        <nav ref={deskInd.ref} className="relative mx-auto hidden max-w-6xl px-4 lg:flex" aria-label="Bölümler">
+          <span className="tab-indicator -bottom-px h-0.5 rounded-full bg-amber" style={deskInd.style} data-animate={deskInd.animate} aria-hidden />
           {TABS.map(([k, label]) => (
             <button
               key={k}
-              onClick={() => setTab(k)}
+              data-key={k}
+              onClick={() => go(k)}
               aria-current={tab === k ? "page" : undefined}
-              className={`-mb-px flex items-center gap-1.5 border-b-2 px-4 py-2 text-sm transition-colors ${tab === k ? "border-amber text-white" : "border-transparent text-mute hover:text-white"}`}
+              className={`tab-label flex items-center gap-1.5 px-4 pb-2.5 pt-2 text-sm ${tab === k ? "text-white" : "text-mute hover:text-white"}`}
             >
               <Icon name={k} className="h-4 w-4" />
               {label}
@@ -270,6 +310,8 @@ export default function Oyun() {
       <Ticker eventTitle={world?.event.id !== "calm" ? world?.event.title : undefined} />
 
       <main className="mx-auto max-w-6xl px-4 pt-4">
+        {/* Sekme değişince yeniden bağlanır ve sekme yönünden kayarak girer */}
+        <div key={tab} className="page-enter" data-dir={dir}>
         {tab === "ofis" && (
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_340px]">
             <div className="space-y-3">
@@ -294,7 +336,7 @@ export default function Oyun() {
               </section>
 
               {waiting > 0 && (
-                <button onClick={() => setTab("posta")} className="card flex w-full items-center justify-between gap-3 border-amber/40 px-4 py-3 text-left text-sm hover:border-amber">
+                <button onClick={() => go("posta")} className="card flex w-full items-center justify-between gap-3 border-amber/40 px-4 py-3 text-left text-sm hover:border-amber">
                   <span>
                     Masanda yanıt bekleyen <span className="font-semibold text-amber">{waiting}</span> iş teklifi var.
                   </span>
@@ -329,7 +371,7 @@ export default function Oyun() {
               <section className="card">
                 <div className="flex items-baseline justify-between border-b border-line px-4 py-2.5">
                   <h2 className="font-serif font-semibold">Donanım parkı</h2>
-                  <button className="text-xs text-amber hover:text-amber-soft" onClick={() => (setTab("uretim"), setSub((s) => ({ ...s, uretim: "donanim" })))}>
+                  <button className="text-xs text-amber hover:text-amber-soft" onClick={() => (go("uretim"), setSub((s) => ({ ...s, uretim: "donanim" })))}>
                     Makine al
                   </button>
                 </div>
@@ -377,16 +419,8 @@ export default function Oyun() {
 
         {tab === "uretim" && (
           <div className="space-y-3">
-            <Segmented
-              value={sub.uretim}
-              options={[
-                ["donanim", "Donanım"],
-                ["atolye", "PC Atölyesi"],
-                ["ihale", "İhaleler"],
-                ["arge", "Ar-Ge"],
-              ]}
-              onChange={(v) => setSub((s) => ({ ...s, uretim: v as any }))}
-            />
+            <Segmented value={sub.uretim} options={URETIM_OPTS} onChange={(v) => goSub("uretim", v as any, keysOf(URETIM_OPTS))} />
+            <div key={sub.uretim} className="page-enter-soft" data-dir={subDir}>
             {sub.uretim === "donanim" ? (
               <ul className="card divide-y divide-line">
                 {EQUIPMENT.map((e) => {
@@ -424,6 +458,7 @@ export default function Oyun() {
             ) : (
               <Research cash={company.cash} now={serverNow} onState={apply} notify={setToast} />
             )}
+            </div>
           </div>
         )}
 
@@ -435,15 +470,8 @@ export default function Oyun() {
 
         {tab === "hayat" && (
           <div className="space-y-3">
-            <Segmented
-              value={sub.hayat}
-              options={[
-                ["iliskiler", "İlişkiler"],
-                ["mulkler", "Mülkler"],
-                ["kulup", "Kulüp"],
-              ]}
-              onChange={(v) => setSub((s) => ({ ...s, hayat: v as any }))}
-            />
+            <Segmented value={sub.hayat} options={HAYAT_OPTS} onChange={(v) => goSub("hayat", v as any, keysOf(HAYAT_OPTS))} />
+            <div key={sub.hayat} className="page-enter-soft" data-dir={subDir}>
             {sub.hayat === "iliskiler" ? (
               <Life cash={company.cash} now={serverNow} onState={apply} notify={setToast} />
             ) : sub.hayat === "mulkler" ? (
@@ -451,20 +479,14 @@ export default function Oyun() {
             ) : (
               <Club cash={company.cash} now={serverNow} onState={apply} notify={setToast} />
             )}
+            </div>
           </div>
         )}
 
         {tab === "gundem" && (
           <div className="space-y-3">
-            <Segmented
-              value={sub.gundem}
-              options={[
-                ["akis", "Sosyal medya"],
-                ["siralama", "Sıralama"],
-                ["seref", "Şeref listesi"],
-              ]}
-              onChange={(v) => setSub((s) => ({ ...s, gundem: v as any }))}
-            />
+            <Segmented value={sub.gundem} options={GUNDEM_OPTS} onChange={(v) => goSub("gundem", v as any, keysOf(GUNDEM_OPTS))} />
+            <div key={sub.gundem} className="page-enter-soft" data-dir={subDir}>
             {sub.gundem === "seref" ? (
               world ? <HallOfFame w={world} /> : <div className="card p-4 text-sm text-mute">Yükleniyor…</div>
             ) : sub.gundem === "akis" ? (
@@ -503,8 +525,10 @@ export default function Oyun() {
                 )}
               </section>
             )}
+            </div>
           </div>
         )}
+        </div>
 
         <footer className="mt-8 flex items-center justify-between border-t border-line pt-3 text-sm text-mute">
           <button onClick={logout} className="hover:text-white">
@@ -519,13 +543,17 @@ export default function Oyun() {
       </main>
 
       {/* Mobil alt gezinme */}
-      <nav className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-7 border-t border-line bg-ink/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden" aria-label="Bölümler">
+      <nav ref={mobInd.ref} className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-7 border-t border-line bg-ink/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden" aria-label="Bölümler">
+        <span className="tab-indicator -top-px flex justify-center" style={mobInd.style} data-animate={mobInd.animate} aria-hidden>
+          <span className="h-0.5 w-7 rounded-full bg-amber" />
+        </span>
         {TABS.map(([k, label]) => (
           <button
             key={k}
-            onClick={() => (setTab(k), window.scrollTo({ top: 0 }))}
+            data-key={k}
+            onClick={() => (go(k), window.scrollTo({ top: 0 }))}
             aria-current={tab === k ? "page" : undefined}
-            className={`relative flex flex-col items-center gap-0.5 py-2 text-[10px] ${tab === k ? "text-amber" : "text-mute"}`}
+            className={`tab-label relative flex flex-col items-center gap-0.5 py-2 text-[10px] ${tab === k ? "text-amber" : "text-mute"}`}
           >
             <Icon name={k} />
             {label}
@@ -557,10 +585,19 @@ function Badge({ n }: { n: number }) {
 }
 
 function Segmented({ value, options, onChange }: { value: string; options: [string, string][]; onChange: (v: string) => void }) {
+  const ind = useSlidingIndicator(value);
   return (
-    <div className="inline-flex max-w-full overflow-x-auto rounded-md border border-line bg-panel p-0.5 text-sm" role="tablist">
+    <div ref={ind.ref} className="relative inline-flex max-w-full overflow-x-auto rounded-md border border-line bg-panel p-0.5 text-sm" role="tablist">
+      <span className="tab-indicator inset-y-0.5 rounded bg-raised shadow-[0_1px_2px_rgba(0,0,0,0.35)]" style={ind.style} data-animate={ind.animate} aria-hidden />
       {options.map(([k, label]) => (
-        <button key={k} role="tab" aria-selected={value === k} onClick={() => onChange(k)} className={`shrink-0 whitespace-nowrap rounded px-3 py-1.5 ${value === k ? "bg-raised text-white" : "text-mute hover:text-white"}`}>
+        <button
+          key={k}
+          data-key={k}
+          role="tab"
+          aria-selected={value === k}
+          onClick={() => onChange(k)}
+          className={`tab-label relative shrink-0 whitespace-nowrap rounded px-3 py-1.5 ${value === k ? "text-white" : "text-mute hover:text-white"}`}
+        >
           {label}
         </button>
       ))}

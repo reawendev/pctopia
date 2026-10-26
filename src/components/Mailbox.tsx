@@ -96,6 +96,12 @@ export function Mailbox({
     if (composeTo) setSel({ kind: "compose", to: composeTo });
   }, [composeTo]);
   const [busy, setBusy] = useState(false);
+  // "Tümünü okundu işaretle": sunucu yanıtı gelene kadar liste anında okunmuş görünür
+  const [allRead, setAllRead] = useState(false);
+  const [marking, setMarking] = useState(false);
+  useEffect(() => {
+    setAllRead(false);
+  }, [data]);
   const paneRef = useRef<HTMLDivElement>(null);
 
   const items: Item[] = useMemo(() => {
@@ -118,6 +124,20 @@ export function Mailbox({
       apiFetch("/api/inbox/read", { method: "POST", body: JSON.stringify({ kind, id }) })
         .then(() => reload())
         .catch(() => {});
+    }
+  }
+
+  async function markAllRead() {
+    setMarking(true);
+    setAllRead(true);
+    try {
+      await apiFetch("/api/inbox/read", { method: "POST", body: JSON.stringify({ all: true }) });
+      await reload();
+    } catch (e: any) {
+      setAllRead(false);
+      notify(e.message);
+    } finally {
+      setMarking(false);
     }
   }
 
@@ -147,6 +167,8 @@ export function Mailbox({
     );
   }
 
+  const unreadCount = allRead ? 0 : items.filter((it) => (it.kind === "offer" ? !it.offer.read : !it.msg.read)).length;
+
   const selectedOffer = sel?.kind === "offer" ? data.offers.find((o) => o.id === sel.id) : undefined;
   const selectedMsg = sel?.kind === "message" ? data.inbox.find((m) => m.id === sel.id) : sel?.kind === "sent" ? data.sent.find((m) => m.id === sel.id) : undefined;
 
@@ -170,6 +192,15 @@ export function Mailbox({
           </button>
         </div>
 
+        {folder === "gelen" && (unreadCount > 0 || marking) && (
+          <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-2 text-xs">
+            <span className="num text-mute">{unreadCount > 0 ? `${unreadCount} okunmamış` : "Hepsi okundu"}</span>
+            <button className="text-amber transition-colors hover:text-amber-soft disabled:opacity-50" disabled={marking} onClick={markAllRead}>
+              Tümünü okundu olarak işaretle
+            </button>
+          </div>
+        )}
+
         {folder === "gelen" ? (
           items.length === 0 ? (
             <p className="px-5 py-6 text-sm text-mute">Kutun boş. İlk teklif birkaç dakika içinde masana düşer.</p>
@@ -178,12 +209,12 @@ export function Mailbox({
               {items.map((it) => {
                 const active = sel && "id" in sel && sel.id === (it.kind === "offer" ? it.offer.id : it.msg.id);
                 if (it.kind === "offer") {
-                  const o = it.offer;
+                  const o = allRead ? { ...it.offer, read: true } : it.offer;
                   const st = offerStatus(o, now);
                   return (
                     <li key={o.id}>
                       <button onClick={() => open("offer", o.id, o.read)} className={`flex w-full gap-3 px-4 py-3 text-left ${active ? "bg-amber/[0.07]" : "hover:bg-raised"}`}>
-                        <span className={`mt-2 h-2 w-2 shrink-0 rounded-full ${o.read ? "bg-transparent" : o.crisis ? "bg-loss" : "bg-amber"}`} aria-label={o.read ? undefined : "okunmadı"} />
+                        <span className={`unread-dot mt-2 h-2 w-2 shrink-0 rounded-full ${o.crisis ? "bg-loss" : "bg-amber"}`} data-off={o.read || undefined} aria-label={o.read ? undefined : "okunmadı"} />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-baseline justify-between gap-2">
                             <span className={`truncate text-sm ${o.read ? "text-mute" : "font-medium text-white"}`}>{o.sender}</span>
@@ -196,11 +227,11 @@ export function Mailbox({
                     </li>
                   );
                 }
-                const m = it.msg;
+                const m = allRead ? { ...it.msg, read: true } : it.msg;
                 return (
                   <li key={m.id}>
                     <button onClick={() => open("message", m.id, m.read)} className={`flex w-full gap-3 px-4 py-3 text-left ${active ? "bg-amber/[0.07]" : "hover:bg-raised"}`}>
-                      <span className={`mt-2 h-2 w-2 shrink-0 rounded-full ${m.read ? "bg-transparent" : "bg-gain"}`} aria-label={m.read ? undefined : "okunmadı"} />
+                      <span className="unread-dot mt-2 h-2 w-2 shrink-0 rounded-full bg-gain" data-off={m.read || undefined} aria-label={m.read ? undefined : "okunmadı"} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-baseline justify-between gap-2">
                           <span className={`truncate text-sm ${m.read ? "text-mute" : "font-medium text-white"}`}>
