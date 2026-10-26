@@ -12,6 +12,7 @@ import { formatCompactMoney, formatMoney } from "@/lib/game/economy";
 import { stageFor } from "@/lib/game/stages";
 import { apiFetch } from "@/lib/supabase/client";
 import { useRequireSession } from "@/lib/useSession";
+import { Splash } from "@/components/Splash";
 
 type Profile = {
   isMe: boolean;
@@ -73,20 +74,26 @@ export default function SirketProfili({ params }: { params: { id: string } }) {
     </Link>
   );
 
+  const splash = <Splash key="splash" done={!!p || !!error} status="Sicil kaydı açılıyor" />;
   if (error)
     return (
-      <main className="mx-auto max-w-4xl space-y-4 px-4 py-8">
-        {back}
-        <div className="card p-5 text-sm text-loss">{error}</div>
-      </main>
+      <>
+        {splash}
+        <main className="mx-auto max-w-4xl space-y-4 px-4 py-8">
+          {back}
+          <div className="card p-5 text-sm text-loss">{error}</div>
+        </main>
+      </>
     );
-  if (!p) return <main className="mx-auto max-w-4xl px-4 py-8 text-sm text-mute">Sicil kaydı açılıyor…</main>;
+  if (!p) return <>{splash}</>;
 
   const c = p.company;
   const career = stageFor(p.netWorth);
   const rep = c.reputation;
 
   return (
+    <>
+    {splash}
     <main className="mx-auto max-w-4xl space-y-3 px-4 py-6">
       <div className="flex items-center justify-between">{back}</div>
 
@@ -257,5 +264,6 @@ export default function SirketProfili({ params }: { params: { id: string } }) {
         </aside>
       </div>
     </main>
+    </>
   );
 }

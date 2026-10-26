@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { formatCompactMoney, formatMoney } from "@/lib/game/economy";
 import { apiFetch } from "@/lib/supabase/client";
 import { useRequireSession } from "@/lib/useSession";
+import { Splash } from "@/components/Splash";
 
 type Player = {
   userId: string;
@@ -58,7 +59,8 @@ export default function Admin() {
     run({ action: "grant", userId: p.userId, amount });
   }
 
-  if (!ready) return null;
+  const splash = <Splash key="splash" done={ready} status="Yönetim katına çıkılıyor" />;
+  if (!ready) return <>{splash}</>;
 
   const players = (data?.players ?? []).filter((p) => {
     const s = q.trim().toLowerCase();
@@ -66,6 +68,8 @@ export default function Admin() {
   });
 
   return (
+    <>
+    {splash}
     <main className="mx-auto max-w-5xl px-4 py-6">
       <div className="mb-5 flex items-center justify-between">
         <h1 className="heading text-2xl">Yönetici paneli</h1>
@@ -164,6 +168,7 @@ export default function Admin() {
         </>
       )}
     </main>
+    </>
   );
 }
 

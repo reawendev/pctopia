@@ -67,6 +67,252 @@ textarea {
   animation-play-state: paused;
 }
 
+/* ---------- Açılış / yükleme perdesi ---------- */
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  pointer-events: auto;
+}
+.splash[data-phase="lifting"] {
+  pointer-events: none;
+}
+.splash[data-mode="fade"] {
+  animation: splash-fade 260ms ease-out both;
+}
+
+.splash-curtain {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 100%;
+  /* Sayfadan bir ton koyu: kalkan kavis zeminden ayrışsın */
+  background: #070d18 radial-gradient(ellipse 90% 45% at 50% 50%, rgba(201, 162, 74, 0.06), transparent 70%);
+  transition: transform 760ms cubic-bezier(0.76, 0, 0.24, 1);
+  will-change: transform;
+}
+.splash-curve {
+  position: absolute;
+  top: calc(100% - 1px);
+  left: 0;
+  width: 100%;
+  height: clamp(90px, 26vh, 240px);
+  display: block;
+}
+.splash[data-phase="lifting"] .splash-curtain {
+  transform: translateY(calc(-100% - clamp(90px, 26vh, 240px)));
+}
+
+.splash-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 24px;
+  text-align: center;
+  transition: opacity 280ms ease-in, transform 280ms ease-in;
+}
+.splash[data-mode="pending"] .splash-content {
+  opacity: 0;
+}
+.splash[data-phase="leaving"] .splash-content,
+.splash[data-phase="lifting"] .splash-content {
+  opacity: 0;
+  transform: translateX(28px);
+}
+
+.splash-word {
+  font-weight: 500;
+  font-size: clamp(22px, 4.2vw, 30px);
+  letter-spacing: 0.42em;
+  margin-right: -0.42em; /* son harfin boşluğunu dengeler */
+  color: #ede6d6;
+}
+.splash-tag {
+  margin-top: 10px;
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+  color: #93a1b5;
+}
+.splash[data-mode="intro"] .splash-word {
+  animation: splash-word 900ms cubic-bezier(0.22, 1, 0.36, 1) 250ms both;
+}
+.splash[data-mode="intro"] .splash-tag {
+  animation: splash-tag 600ms ease-out 750ms both;
+}
+
+.splash-status {
+  margin-top: 28px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: #93a1b5;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 300ms ease-out, transform 300ms ease-out;
+}
+.splash-status[data-on] {
+  opacity: 1;
+  transform: none;
+}
+.splash-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 22px;
+  border-radius: 999px;
+  background: #1b2c44;
+  color: #c9a24a;
+}
+
+@keyframes splash-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes splash-word {
+  from {
+    opacity: 0;
+    letter-spacing: 0.7em;
+    margin-right: -0.7em;
+    filter: blur(6px);
+  }
+}
+@keyframes splash-tag {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+/* ---------- İki noktalı yükleyici ---------- */
+.dot-loader {
+  position: relative;
+  display: inline-block;
+  width: 22px;
+  height: 8px;
+}
+.dot-loader > span {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+  animation: dot-a 900ms cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+.dot-loader > span + span {
+  animation-name: dot-b;
+}
+@keyframes dot-a {
+  0%,
+  100% {
+    transform: translateX(0) scale(1);
+    z-index: 2;
+  }
+  50% {
+    transform: translateX(14px) scale(1.15);
+    z-index: 2;
+  }
+}
+@keyframes dot-b {
+  0%,
+  100% {
+    transform: translateX(14px) scale(0.7);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translateX(0) scale(0.7);
+    opacity: 0.55;
+  }
+}
+
+/* ---------- Giriş ekranı: kademeli beliriş + butonun hapa dönüşmesi ---------- */
+.reveal > * {
+  opacity: 0;
+}
+.reveal[data-on] > * {
+  animation: reveal-up 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i, 0) * 70ms + 120ms);
+}
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.btn-morph {
+  position: relative;
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  margin-inline: auto;
+  border-radius: 6px;
+  transition: max-width 420ms cubic-bezier(0.65, 0, 0.35, 1), border-radius 420ms cubic-bezier(0.65, 0, 0.35, 1), background-color 150ms;
+}
+.btn-morph > .btn-label,
+.btn-morph > .btn-dots {
+  transition: opacity 180ms ease;
+}
+.btn-morph > .btn-dots {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+}
+.btn-morph[data-busy] {
+  max-width: 72px;
+  border-radius: 999px;
+}
+.btn-morph[data-busy]:disabled {
+  opacity: 1;
+}
+.btn-morph[data-busy] > .btn-label {
+  opacity: 0;
+}
+.btn-morph[data-busy] > .btn-dots {
+  opacity: 1;
+  transition-delay: 220ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splash-curtain {
+    transition: opacity 300ms ease;
+  }
+  .splash[data-phase="lifting"] .splash-curtain {
+    transform: none;
+    opacity: 0;
+  }
+  .splash-curve {
+    display: none;
+  }
+  .splash[data-mode="intro"] .splash-word,
+  .splash[data-mode="intro"] .splash-tag,
+  .reveal[data-on] > * {
+    animation-name: splash-fade;
+  }
+  .splash[data-phase="leaving"] .splash-content,
+  .splash[data-phase="lifting"] .splash-content {
+    transform: none;
+  }
+  .dot-loader > span {
+    animation-duration: 1.8s;
+  }
+}
+
 @layer components {
   .card {
     @apply rounded-md border border-line bg-panel;

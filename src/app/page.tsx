@@ -7,6 +7,8 @@ import { Logo } from "@/components/Logo";
 import { DEFAULT_LOGO } from "@/lib/game/config";
 import { formatCompactMoney } from "@/lib/game/economy";
 import { STAGES } from "@/lib/game/stages";
+import { Splash } from "@/components/Splash";
+import { DotLoader } from "@/components/DotLoader";
 
 export default function Home() {
   const router = useRouter();
@@ -16,16 +18,23 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [checked, setChecked] = useState(false); // oturum kontrolü bitti, giriş formu gösterilecek
+  const [revealed, setRevealed] = useState(false);
+  const [entering, setEntering] = useState(false); // giriş başarılı, oyuna geçiliyor
 
   useEffect(() => {
     try {
       supabaseBrowser()
         .auth.getSession()
         .then(({ data }) => {
+          // Oturum varsa perde açılmadan oyuna geç; /oyun aynı perdeyle devam eder
           if (data.session) router.replace("/oyun");
-        });
+          else setChecked(true);
+        })
+        .catch(() => setChecked(true));
     } catch (e: any) {
       setError(e.message);
+      setChecked(true);
     }
   }, [router]);
 
@@ -42,34 +51,40 @@ export default function Home() {
         if (!data.session) {
           setNotice("Kayıt alındı. E-postana gelen doğrulama bağlantısına tıkla, sonra giriş yap.");
           setMode("login");
+          setBusy(false);
           return;
         }
       } else {
         const { error } = await sb.auth.signInWithPassword({ email, password });
         if (error) throw error;
       }
+      await new Promise((r) => setTimeout(r, 450)); // hap animasyonu görünsün
+      setEntering(true);
       router.replace("/oyun");
+      return;
     } catch (err: any) {
       setError(translate(err.message));
-    } finally {
       setBusy(false);
     }
   }
 
   return (
+    <>
+    <Splash done={checked} onLift={() => setRevealed(true)} />
+    {entering && <Splash done={false} appear="fade" />}
     <main className="mx-auto grid min-h-screen max-w-5xl items-center gap-10 px-5 py-10 lg:grid-cols-[1fr_380px] lg:gap-16">
-      <section>
-        <div className="mb-10 flex items-center gap-3">
+      <section className="reveal" data-on={revealed ? "" : undefined}>
+        <div className="mb-10 flex items-center gap-3" style={{ "--i": 0 } as React.CSSProperties}>
           <Logo spec={DEFAULT_LOGO} size={36} />
           <span className="font-serif text-xl font-semibold">PCTopia</span>
         </div>
 
-        <h1 className="heading max-w-xl text-4xl leading-[1.1] sm:text-5xl">Bir garajda, ikinci el bir bilgisayarla başla.</h1>
-        <p className="mt-5 max-w-lg text-lg leading-relaxed text-mute">
+        <h1 className="heading max-w-xl text-4xl leading-[1.1] sm:text-5xl" style={{ "--i": 1 } as React.CSSProperties}>Bir garajda, ikinci el bir bilgisayarla başla.</h1>
+        <p className="mt-5 max-w-lg text-lg leading-relaxed text-mute" style={{ "--i": 2 } as React.CSSProperties}>
           Şirketini kur, donanım parkını büyüt, borsada yatırım yap. Arkadaşlarınla aynı piyasada, sektörün zirvesi için yarış.
         </p>
 
-        <ol className="mt-10 hidden max-w-md sm:block" aria-label="Kariyer basamakları">
+        <ol className="mt-10 hidden max-w-md sm:block" aria-label="Kariyer basamakları" style={{ "--i": 3 } as React.CSSProperties}>
           {STAGES.map((s, i) => (
             <li key={s.level} className="flex items-baseline gap-4 border-l border-line py-1.5 pl-5" style={{ opacity: 1 - i * 0.1 }}>
               <span className={`font-serif ${i === 0 ? "text-amber" : "text-white"}`}>{s.title}</span>
@@ -79,8 +94,8 @@ export default function Home() {
         </ol>
       </section>
 
-      <form onSubmit={submit} className="card space-y-4 p-6">
-        <div className="grid grid-cols-2 border-b border-line text-sm">
+      <form onSubmit={submit} className="card reveal space-y-4 p-6" data-on={revealed ? "" : undefined}>
+        <div className="grid grid-cols-2 border-b border-line text-sm" style={{ "--i": 2 } as React.CSSProperties}>
           {(["login", "signup"] as const).map((m) => (
             <button
               key={m}
@@ -94,11 +109,11 @@ export default function Home() {
           ))}
         </div>
 
-        <div>
+        <div style={{ "--i": 3 } as React.CSSProperties}>
           <label className="label" htmlFor="email">E-posta</label>
           <input id="email" className="input" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
-        <div>
+        <div style={{ "--i": 4 } as React.CSSProperties}>
           <label className="label" htmlFor="pw">Şifre</label>
           <input
             id="pw"
@@ -115,11 +130,18 @@ export default function Home() {
         {error && <p className="text-sm text-loss" role="alert">{error}</p>}
         {notice && <p className="text-sm text-gain">{notice}</p>}
 
-        <button className="btn btn-primary w-full" disabled={busy}>
-          {busy ? "Bekle…" : mode === "login" ? "Giriş yap" : "Hesap oluştur"}
-        </button>
+        <div style={{ "--i": 5 } as React.CSSProperties}>
+          <button className="btn btn-primary btn-morph" disabled={busy} data-busy={busy ? "" : undefined} aria-busy={busy}>
+            <span className="btn-label">{mode === "login" ? "Giriş yap" : "Hesap oluştur"}</span>
+            <span className="btn-dots">
+              <DotLoader />
+            </span>
+            {busy && <span className="sr-only">Bekle…</span>}
+          </button>
+        </div>
       </form>
     </main>
+    </>
   );
 }
 

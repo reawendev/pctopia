@@ -25,6 +25,7 @@ import {
 import { formatMoney } from "@/lib/game/economy";
 import { apiFetch } from "@/lib/supabase/client";
 import { useRequireSession } from "@/lib/useSession";
+import { Splash } from "@/components/Splash";
 
 const TR = {
   gender: { man: "Erkek", woman: "Kadın" },
@@ -51,12 +52,16 @@ export default function Kurulus() {
   const [generating, setGenerating] = useState<"portrait" | "logo" | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [checked, setChecked] = useState(false);
 
   useEffect(() => {
     if (!ready) return;
-    apiFetch("/api/company").then((s) => {
-      if (s.hasCompany) router.replace("/oyun");
-    });
+    apiFetch("/api/company")
+      .then((s) => {
+        if (s.hasCompany) router.replace("/oyun");
+        else setChecked(true);
+      })
+      .catch(() => setChecked(true));
     apiFetch<GenStatus>("/api/generate").then(setGen).catch(() => setGen(null));
   }, [ready, router]);
 
@@ -94,11 +99,14 @@ export default function Kurulus() {
     }
   }
 
-  if (!ready) return null;
+  const splash = <Splash key="splash" done={ready && checked} status="Tescil dairesi açılıyor" />;
+  if (!ready) return <>{splash}</>;
 
   const canGenerate = !!gen?.enabled;
 
   return (
+    <>
+    {splash}
     <main className="mx-auto max-w-5xl px-4 py-8 sm:py-12">
       <header className="mb-8 max-w-2xl">
         <h1 className="heading text-3xl sm:text-4xl">Şirket tescili</h1>
@@ -202,6 +210,7 @@ export default function Kurulus() {
         </aside>
       </form>
     </main>
+    </>
   );
 }
 

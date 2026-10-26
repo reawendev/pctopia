@@ -26,6 +26,7 @@ import { dayNumber, stageFor } from "@/lib/game/stages";
 import { apiFetch, supabaseBrowser } from "@/lib/supabase/client";
 import { ago } from "@/lib/time";
 import { useRequireSession } from "@/lib/useSession";
+import { Splash } from "@/components/Splash";
 
 type Company = {
   id: string;
@@ -197,7 +198,9 @@ export default function Oyun() {
     router.replace("/");
   }
 
-  if (!ready || !state) return <div className="p-8 text-sm text-mute">Genel merkeze bağlanılıyor…</div>;
+  // Perde her iki dalda da Fragment'in ilk çocuğu: React aynı örneği korur, kapanış animasyonu oyunun üstünde oynar
+  const splash = <Splash key="splash" done={ready && !!state} error={!state ? toast || undefined : undefined} />;
+  if (!ready || !state) return <>{splash}</>;
 
   const { company, owned } = state;
   const rate = incomePerHour(owned);
@@ -213,6 +216,8 @@ export default function Oyun() {
   const rep = company.reputation ?? 50;
 
   return (
+    <>
+    {splash}
     <div className="pb-24 lg:pb-10">
       {/* Sabit üst bar */}
       <header className="sticky top-0 z-20 border-b border-line bg-ink/95 backdrop-blur">
@@ -539,6 +544,7 @@ export default function Oyun() {
         </div>
       )}
     </div>
+    </>
   );
 }
 
