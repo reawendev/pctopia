@@ -26,23 +26,40 @@ export class HttpError extends Error {
 
 export type AuthedUser = { id: string; email?: string; isAdmin: boolean };
 
+// Profil (yönetici / askı) bilgisi sıcak sunucu örneğinde kısa süre tutulur: her istekte veritabanına gitmeyelim.
+// Bir yasaklama en geç bu süre sonunda etkili olur.
+const PROFILE_TTL_MS = 30_000;
+const profileCache = new Map<string, { at: number; isAdmin: boolean; banned: boolean }>();
+
+async function loadProfile(userId: string) {
+  const hit = profileCache.get(userId);
+  if (hit && Date.now() - hit.at < PROFILE_TTL_MS) return hit;
+  const { data } = await db().from("profiles").select("is_admin, banned").eq("id", userId).maybeSingle();
+  const p = { at: Date.now(), isAdmin: !!data?.is_admin, banned: !!data?.banned };
+  if (profileCache.size > 5000) profileCache.clear();
+  profileCache.set(userId, p);
+  return p;
+}
+
+/** Yasaklama/yetki değişince çağrılır (aynı sunucu örneğinde hemen etkili olsun). */
+export function forgetProfile(userId: string) {
+  profileCache.delete(userId);
+}
+
 export async function requireUser(req: Request): Promise<AuthedUser> {
   const header = req.headers.get("authorization") || "";
   const token = header.startsWith("Bearer ") ? header.slice(7) : "";
   if (!token) throw new HttpError(401, "Giriş yapmalısın");
 
-  const client = db();
-  const { data, error } = await client.auth.getUser(token);
-  if (error || !data.user) throw new HttpError(401, "Oturum geçersiz");
+  // getClaims: proje asimetrik imza anahtarı kullanıyorsa jetonu yerelde doğrular (ağ turu yok);
+  // eski HS256 anahtarlarında kendiliğinden Auth sunucusuna sorar (eskisiyle aynı).
+  const { data, error } = await db().auth.getClaims(token);
+  const claims = data?.claims;
+  if (error || !claims?.sub) throw new HttpError(401, "Oturum geçersiz");
 
-  const { data: profile } = await client
-    .from("profiles")
-    .select("is_admin, banned")
-    .eq("id", data.user.id)
-    .maybeSingle();
-
-  if (profile?.banned) throw new HttpError(403, "Hesabın askıya alınmış");
-  return { id: data.user.id, email: data.user.email, isAdmin: !!profile?.is_admin };
+  const profile = await loadProfile(claims.sub);
+  if (profile.banned) throw new HttpError(403, "Hesabın askıya alınmış");
+  return { id: claims.sub, email: typeof claims.email === "string" ? claims.email : undefined, isAdmin: profile.isAdmin };
 }
 
 export async function requireAdmin(req: Request): Promise<AuthedUser> {

@@ -59,7 +59,7 @@ export async function payShares(companyId: string, amount: number, source: strin
 }
 
 /** Biriken geliri kasaya geçirir (sürüm kilidiyle). Toplanan tutarı döndürür. */
-export async function collectIncome(userId: string, auto = false): Promise<{ collected: number; row: CompanyRow }> {
+export async function collectIncome(userId: string, auto = false): Promise<{ collected: number; row: CompanyRow; state: NonNullable<Awaited<ReturnType<typeof loadCompany>>> }> {
   for (let attempt = 0; attempt < 3; attempt++) {
     const state = await loadCompany(userId);
     if (!state) throw new HttpError(404, "Önce şirket kurmalısın");
@@ -79,8 +79,8 @@ export async function collectIncome(userId: string, auto = false): Promise<{ col
         await logEvent(company.id, "collect", `${auto ? "Muhasebeci" : "Muhasebe"} ${formatMoney(gain)} tahsilat yaptı.`, gain);
         await payShares(company.id, gain, "tahsilat");
       }
-      const fresh = (await loadCompany(userId))!.company;
-      return { collected: gain, row: fresh };
+      const fresh = (await loadCompany(userId))!;
+      return { collected: gain, row: fresh.company, state: fresh };
     }
   }
   throw new HttpError(409, "Eşzamanlı işlem, tekrar dene");

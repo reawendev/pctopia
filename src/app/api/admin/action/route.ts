@@ -1,4 +1,4 @@
-import { db, handle, HttpError, requireAdmin } from "@/lib/server/supabase";
+import { db, forgetProfile, handle, HttpError, requireAdmin } from "@/lib/server/supabase";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -36,6 +36,7 @@ export const POST = handle(async (req) => {
     case "unban": {
       const { error } = await db().from("profiles").update({ banned: action === "ban" }).eq("id", userId);
       if (error) throw new HttpError(500, error.message);
+      forgetProfile(userId);
       return { ok: true };
     }
     case "removeImages": {

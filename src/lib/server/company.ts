@@ -78,9 +78,16 @@ export async function loadCompany(
   if (error) throw new HttpError(500, error.message);
   if (!company) return null;
 
-  const [eq, hold] = await Promise.all([
+  // Hız: şirket satırından sonraki bütün okumalar tek turda, paralel.
+  // Günlük de aynı turda önden çekilir; hemen ardından gelen loadJournal() ağa çıkmadan bunu kullanır.
+  prefetchJournal(company.id);
+  const [eq, hold, bank, status, staff, ph] = await Promise.all([
     db().from("company_equipment").select("equipment_id, qty").eq("company_id", company.id),
     db().from("company_holdings").select("stock_id, shares, cost_basis").eq("company_id", company.id),
+    optional<BankRow>(db().from("bank_accounts").select("*").eq("company_id", company.id)),
+    optional<{ price: number }>(db().from("status_items").select("price").eq("company_id", company.id)),
+    optional<{ role: Role }>(db().from("employees").select("role").eq("company_id", company.id)),
+    optional<{ shares: number }>(db().from("player_holdings").select("shares").eq("holder", company.id)),
   ]);
   if (eq.error) throw new HttpError(500, eq.error.message);
   if (hold.error && !isMissingTable(hold.error)) throw new HttpError(500, hold.error.message);
@@ -90,15 +97,9 @@ export async function loadCompany(
   const holdings: Holdings = {};
   for (const r of hold.data ?? []) holdings[r.stock_id] = { shares: Number(r.shares), costBasis: Number(r.cost_basis) };
 
-  const [bank, status, staff] = await Promise.all([
-    optional<BankRow>(db().from("bank_accounts").select("*").eq("company_id", company.id)),
-    optional<{ price: number }>(db().from("status_items").select("price").eq("company_id", company.id)),
-    optional<{ role: Role }>(db().from("employees").select("role").eq("company_id", company.id)),
-  ]);
   const row = company as CompanyRow;
   row._extra = extraWorth(bank[0], status.map((s) => s.price)) + facilityWorth(row);
   // Elindeki oyuncu şirket hisseleri (011)
-  const ph = await optional<{ shares: number }>(db().from("player_holdings").select("shares").eq("holder", row.id));
   if (ph.length) {
     const { holdingsValueOf } = await import("./equity");
     row._extra += await holdingsValueOf(row.id);
@@ -181,11 +182,43 @@ export type JournalEntry = { id: number; kind: string; text: string; amount: num
 
 /** Günlüğe kayıt düşer. Başarısız olursa oyunu durdurmaz. */
 export async function logEvent(companyId: string, kind: string, text: string, amount?: number): Promise<void> {
+  bumpJournal(companyId);
   const { error } = await db().from("company_events").insert({ company_id: companyId, kind, text, amount: amount ?? null });
+  bumpJournal(companyId); // yazım sürerken başlamış bir ön çekim de geçersiz sayılsın
   if (error && !isMissingTable(error)) console.error("logEvent", error.message);
 }
 
+// ---- Günlük ön çekimi ----
+// loadCompany() günlüğü paralel çeker; ardından gelen loadJournal() bunu tüketir.
+// Arada logEvent() çalıştıysa sürüm değişir ve ön çekim kullanılmaz, günlük taze okunur.
+const JOURNAL_TTL_MS = 3000;
+const journalVersion = new Map<string, number>();
+const journalPrefetch = new Map<string, { at: number; version: number; promise: Promise<JournalEntry[]> }>();
+
+function bumpJournal(companyId: string) {
+  journalVersion.set(companyId, (journalVersion.get(companyId) ?? 0) + 1);
+  journalPrefetch.delete(companyId);
+}
+
+function prefetchJournal(companyId: string) {
+  const now = Date.now();
+  // Bayat girdileri temizle (sıcak sunucu örneğinde birikmesin)
+  if (journalPrefetch.size > 200) journalPrefetch.forEach((v, k) => now - v.at > JOURNAL_TTL_MS && journalPrefetch.delete(k));
+  const promise = fetchJournal(companyId, 20);
+  promise.catch(() => {});
+  journalPrefetch.set(companyId, { at: now, version: journalVersion.get(companyId) ?? 0, promise });
+}
+
 export async function loadJournal(companyId: string, limit = 20): Promise<JournalEntry[]> {
+  const pre = journalPrefetch.get(companyId);
+  if (pre && limit === 20 && pre.version === (journalVersion.get(companyId) ?? 0) && Date.now() - pre.at < JOURNAL_TTL_MS) {
+    journalPrefetch.delete(companyId);
+    return pre.promise;
+  }
+  return fetchJournal(companyId, limit);
+}
+
+async function fetchJournal(companyId: string, limit: number): Promise<JournalEntry[]> {
   const { data, error } = await db()
     .from("company_events")
     .select("id, kind, text, amount, created_at")
