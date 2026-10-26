@@ -23,7 +23,7 @@ import {
   type LogoSpec,
 } from "@/lib/game/config";
 import { formatMoney } from "@/lib/game/economy";
-import { apiFetch } from "@/lib/supabase/client";
+import { apiFetch, supabaseBrowser } from "@/lib/supabase/client";
 import { useRequireSession } from "@/lib/useSession";
 import { Splash } from "@/components/Splash";
 
@@ -63,6 +63,15 @@ export default function Kurulus() {
       })
       .catch(() => setChecked(true));
     apiFetch<GenStatus>("/api/generate").then(setGen).catch(() => setGen(null));
+    // Google ile girildiyse kurucu adını hesaptaki addan öner (oyuncu değiştirebilir)
+    supabaseBrowser()
+      .auth.getUser()
+      .then(({ data }) => {
+        const m = data.user?.user_metadata ?? {};
+        const full = String(m.full_name || m.name || "").trim().replace(/\s+/g, " ");
+        if (full) setFounderName((cur) => cur || full.slice(0, 24));
+      })
+      .catch(() => {});
   }, [ready, router]);
 
   async function generate(kind: "portrait" | "logo") {

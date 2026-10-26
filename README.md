@@ -20,6 +20,7 @@
    - `supabase/migrations/011_halka_arz_operasyon.sql`
    - `supabase/migrations/012_kulup_bahis.sql`
    - `supabase/migrations/013_banka_kilit.sql`
+   - `supabase/migrations/014_bildirimler.sql` (içindeki `CRON_SECRET_BURAYA` yerine kendi değerini yaz)
 
    Mevcut bir veritabanını güncelliyorsan yalnızca henüz çalıştırmadığın `migrations/` dosyalarını çalıştır.
 2. `.env.example` dosyasını `.env.local` olarak kopyala, Supabase anahtarlarını gir.
@@ -206,3 +207,21 @@ Next.js 14, yalnızca GET içeren route'lardaki `fetch` isteklerini kalıcı ola
 - [ ] Mobil sürüm (Capacitor ile Android/iOS)
 - [x] Kulüp: masa oyunları, piyasa bahsi, bahis bürosu
 - [ ] Satın alma ve birleşme, temettü
+
+## Google ile giriş
+
+1. Google Cloud Console → APIs & Services → Credentials → **Create credentials → OAuth client ID** (Web application).
+   - Authorized JavaScript origins: `https://pctopia.vercel.app`
+   - Authorized redirect URIs: `https://<proje>.supabase.co/auth/v1/callback`
+2. Supabase → Authentication → Sign In / Providers → **Google**: Client ID ve Client Secret'ı gir, aç.
+3. Supabase → Authentication → URL Configuration: Site URL `https://pctopia.vercel.app`, Redirect URLs'e `https://pctopia.vercel.app/**` ekle.
+
+Sağlayıcı açılana kadar giriş ekranında Google butonu görünmez. Aynı e-postayla daha önce kayıt olmuş oyuncu Google ile girince aynı hesaba bağlanır.
+
+## Bildirimler (web push)
+
+- `public/sw.js` bildirimleri gösterir; oyuncu Ofis'teki karttan ya da sayfa altındaki "Bildirimler" satırından açar.
+- Posta anında bildirilir. İş sonucu, yeni teklif zamanı ve kasanın dolması Supabase `pg_cron` ile 2 dakikada bir `/api/cron/push` üzerinden kontrol edilir (oyunun durumunu değiştirmez, yalnızca okur).
+- Oyuncu oyundayken (son 90 sn) bildirim gönderilmez.
+- iPhone'da bildirimler yalnızca site ana ekrana eklenip oradan açılınca çalışır (iOS 16.4+).
+- Vercel ortam değişkenleri: `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `CRON_SECRET`.

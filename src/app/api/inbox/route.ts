@@ -7,6 +7,7 @@ import { syncTenders } from "@/lib/server/tenders";
 import { syncFacility } from "@/lib/server/facility";
 import { settleMarketBets, syncPools } from "@/lib/server/casino";
 import { offerView, syncOffers, type OfferRow } from "@/lib/server/offers";
+import { markSeen } from "@/lib/server/push";
 import { db, handle, HttpError, requireUser } from "@/lib/server/supabase";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +17,8 @@ type MsgRow = { id: string; from_company: string; to_company: string; subject: s
 
 export const GET = handle(async (req) => {
   const user = await requireUser(req);
+  // Oyun açık: bu sırada bildirim gönderilmesin (yanıtı bekletmez)
+  const seen = markSeen(user.id).catch(() => {});
   const tendersChanged = await syncTenders();
   const g = await gameContext(user.id);
   const { company, owned } = g;
@@ -32,6 +35,7 @@ export const GET = handle(async (req) => {
   const { changed: offersChanged, ready } = await syncOffers(company, owned, g.netWorth, g.perks);
   const changed = salesChanged || offersChanged || financeChanged;
   if (!ready) {
+    await seen;
     return { ready: false, offers: [], inbox: [], sent: [], unread: { offers: 0, messages: 0 }, changed };
   }
 
@@ -71,6 +75,7 @@ export const GET = handle(async (req) => {
     .gt("expires_at", new Date().toISOString());
   const inboxList = ((inbox.data ?? []) as MsgRow[]).map(msgView);
 
+  await seen;
   return {
     ready: true,
     changed,

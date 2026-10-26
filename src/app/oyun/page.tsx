@@ -29,6 +29,7 @@ import { useRequireSession } from "@/lib/useSession";
 import { Splash } from "@/components/Splash";
 import { RollingNumber } from "@/components/RollingNumber";
 import { useToasts } from "@/components/Toaster";
+import { PushInvite, PushSetting, usePush } from "@/components/Notifications";
 import { direction, useIsMobile, useSlidingIndicator, useSwipe } from "@/components/Motion";
 import { SkeletonCard, SkeletonLines } from "@/components/Skeleton";
 
@@ -116,6 +117,7 @@ export default function Oyun() {
   const [skew, setSkew] = useState(0); // sunucu saati - istemci saati
   const [bootError, setBootError] = useState("");
   const { notify: setToast, node: toasts } = useToasts();
+  const push = usePush(setToast);
   const [board, setBoard] = useState<Board | null>(null);
   const [inbox, setInbox] = useState<InboxData | null>(null);
   // Günlüğe yeni düşen kayıtlar kısa süre vurgulanır
@@ -404,6 +406,8 @@ export default function Oyun() {
                 </button>
               )}
 
+              <PushInvite push={push} />
+
               <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-md border border-line bg-line sm:grid-cols-4">
                 <Figure label="Saatlik gelir" value={<RollingNumber value={rate} format={formatMoney} flash />} />
                 <Figure label="Portföy" value={<RollingNumber value={state.portfolioValue ?? 0} format={formatCompactMoney} flash />} />
@@ -598,10 +602,11 @@ export default function Oyun() {
         )}
         </div>
 
-        <footer className="mt-8 flex items-center justify-between border-t border-line pt-3 text-sm text-mute">
+        <footer className="mt-8 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t border-line pt-3 text-sm text-mute">
           <button onClick={logout} className="hover:text-white">
             Çıkış yap
           </button>
+          <PushSetting push={push} />
           {isAdmin && (
             <Link href="/admin" className="text-amber hover:text-amber-soft">
               Yönetici paneli

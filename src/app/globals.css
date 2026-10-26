@@ -283,6 +283,11 @@ textarea {
   }
 }
 
+/* Google butonu ayarlar gelince belirir */
+.google-in {
+  animation: reveal-up 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 .btn-morph {
   position: relative;
   display: flex;

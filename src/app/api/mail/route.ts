@@ -1,4 +1,5 @@
 import { isMissingTable, loadCompany } from "@/lib/server/company";
+import { isOnline, sendToUser } from "@/lib/server/push";
 import { db, handle, HttpError, requireUser } from "@/lib/server/supabase";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ export const POST = handle(async (req) => {
   if (!state) throw new HttpError(404, "Önce şirket kurmalısın");
   if (to === state.company.id) throw new HttpError(400, "Kendi şirketine posta gönderemezsin");
 
-  const { data: target, error: tErr } = await db().from("companies").select("id, name").eq("id", to).maybeSingle();
+  const { data: target, error: tErr } = await db().from("companies").select("id, name, owner_id").eq("id", to).maybeSingle();
   if (tErr) throw new HttpError(500, tErr.message);
   if (!target) throw new HttpError(404, "Alıcı şirket bulunamadı");
 
@@ -44,5 +45,19 @@ export const POST = handle(async (req) => {
     .select("id, created_at")
     .single();
   if (error) throw new HttpError(500, error.message);
+
+  // Alıcı oyunda değilse telefonuna/tarayıcısına bildirim (başarısız olsa da posta gönderilmiş sayılır)
+  try {
+    if (target.owner_id && !(await isOnline(target.owner_id))) {
+      await sendToUser(target.owner_id, {
+        title: `${state.company.name}: ${subject}`,
+        body: text.length > 140 ? text.slice(0, 139) + "…" : text,
+        url: "/oyun?sekme=posta",
+        tag: `posta-${data.id}`,
+      });
+    }
+  } catch (e: any) {
+    console.error("mail push", e?.message);
+  }
   return { ok: true, id: data.id, to: target.name };
 });
