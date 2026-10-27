@@ -3,7 +3,7 @@
 import { randomInt } from "node:crypto";
 import {
   blackjackResult, dicePayout, handValue, isBlackjack, LEADER_CLOSE_HOURS, LEADER_HOUR_UTC, LOSS_LOVE, LOSS_NEWS_MIN, LOSS_NEWS_RATIO,
-  LOSS_REP, MARKET_HORIZONS, maxBet, MIN_BET, oddsFor, roulettePayout, type Card, type DiceBet, type RouletteBet,
+  LOSS_REP, MARKET_HORIZONS, maxBet, MIN_BET, oddsFor, roulettePayout, SPIN_SEGMENTS, spinPayout, type Card, type DiceBet, type RouletteBet,
 } from "../game/casino";
 import { formatMoney } from "../game/economy";
 import { STOCK_BY_ID, TICK_MS } from "../game/market";
@@ -72,6 +72,16 @@ export async function playRoulette(p: Player, betRaw: number, choice: RouletteBe
   await apply(p.id, bet, payout);
   await record(p, "rulet", bet, payout, { choice, n });
   return { n, payout, net: payout - bet };
+}
+
+export async function playSpin(p: Player, betRaw: number) {
+  const bet = await checkBet(p, betRaw);
+  const index = randomInt(0, SPIN_SEGMENTS.length);
+  const mult = spinPayout(index);
+  const payout = Math.floor(bet * mult);
+  await apply(p.id, bet, payout);
+  await record(p, "cark", bet, payout, { index, mult });
+  return { index, mult, payout, net: payout - bet };
 }
 
 export async function playDice(p: Player, betRaw: number, choice: DiceBet) {

@@ -1,7 +1,7 @@
 import { isRouletteBet, type DiceBet } from "@/lib/game/casino";
 import { formatMoney } from "@/lib/game/economy";
 import {
-  blackjack, clubSummary, loadHand, marketQuotes, placeMarketBet, placePoolBet, playDice, playRoulette, poolsView, settleMarketBets, syncPools, type Player,
+  blackjack, clubSummary, loadHand, marketQuotes, placeMarketBet, placePoolBet, playDice, playSpin, playRoulette, poolsView, settleMarketBets, syncPools, type Player,
 } from "@/lib/server/casino";
 import { loadCompany, loadJournal, view } from "@/lib/server/company";
 import { invalidateEquity } from "@/lib/server/equity";
@@ -64,6 +64,19 @@ export const POST = handle(async (req) => {
       const r = await playRoulette(p, Number(body.bet), body.choice);
       result = r;
       message = r.net > 0 ? `Top ${r.n} numarada durdu. ${formatMoney(r.net)} kazandın.` : `Top ${r.n} numarada durdu. Kaybettin.`;
+      break;
+    }
+    case "spin": {
+      const r = await playSpin(p, Number(body.bet));
+      result = r;
+      message =
+        r.mult === 0
+          ? "Çark boşta durdu. Kaybettin."
+          : r.net > 0
+          ? `Çark ×${r.mult.toLocaleString("tr-TR")} üzerinde durdu. ${formatMoney(r.net)} kazandın.`
+          : r.net === 0
+          ? `Çark ×${r.mult.toLocaleString("tr-TR")} üzerinde durdu. Bahsin geri geldi.`
+          : `Çark ×${r.mult.toLocaleString("tr-TR")} üzerinde durdu. ${formatMoney(-r.net)} kaybettin.`;
       break;
     }
     case "dice": {

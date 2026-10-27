@@ -101,3 +101,17 @@ export const LOSS_NEWS_MIN = 20_000;
 export const LOSS_NEWS_RATIO = 0.2; // 24 saatte şirket değerinin %20'si
 export const LOSS_REP = 3;
 export const LOSS_LOVE = 8;
+
+// ---- Şans çarkı (32 dilim; kasa avantajı ≈ %4,7) ----
+// Dilimler çarkın üzerindeki sırayla; büyük çarpanlar dağıtılmış. 0: boş.
+export const SPIN_SEGMENTS: number[] = [
+  0, 1.5, 0, 0.5, 0, 2, 0, 3, 0, 0.5, 0, 1.5, 0, 2, 0, 0.5,
+  0, 0, 10, 0, 0.5, 0, 1.5, 0, 3, 0, 2, 0, 0.5, 0, 1.5, 0,
+];
+
+export function spinPayout(index: number): number {
+  return SPIN_SEGMENTS[index] ?? 0;
+}
+
+/** Beklenen geri ödeme (bahis başına). */
+export const SPIN_RTP = SPIN_SEGMENTS.reduce((s, m) => s + m, 0) / SPIN_SEGMENTS.length;

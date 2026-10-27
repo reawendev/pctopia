@@ -131,3 +131,15 @@ console.log("rules: tüm testler geçti");
   assert.ok(payroll(SALARY_KNEE) / SALARY_KNEE <= 0.22 + 1e-9);
   for (let inc = 0; inc < 300_000; inc += 997) assert.ok(payroll(inc + 997) >= payroll(inc), "monoton");
 }
+
+// ---- Şans çarkı: kasa önde, ama oyuncu için makul ----
+{
+  const { SPIN_SEGMENTS, SPIN_RTP, spinPayout } = require("../src/lib/game/casino");
+  assert.equal(SPIN_SEGMENTS.length, 32);
+  assert.ok(SPIN_RTP > 0.93 && SPIN_RTP < 0.97, `RTP ${SPIN_RTP}`);
+  assert.equal(spinPayout(18), 10);
+  for (let i = 0; i < 32; i++) {
+    const run = [0, 1, 2].every((k) => SPIN_SEGMENTS[(i + k) % 32] === 0);
+    assert.ok(!run, "üç boş dilim yan yana olmasın");
+  }
+}

@@ -725,3 +725,62 @@ textarea {
     @apply font-serif font-semibold tracking-tight;
   }
 }
+
+/* ---- Kulüp animasyonları ---- */
+
+/* Zar: masaya atılır, sekip durur. data-roll 0/1 arasında değişir ki animasyon her atışta baştan oynasın. */
+.dice-hop[data-roll="0"] {
+  animation: dice-hop-a 1.4s cubic-bezier(0.3, 0.7, 0.4, 1) both;
+}
+.dice-hop[data-roll="1"] {
+  animation: dice-hop-b 1.4s cubic-bezier(0.3, 0.7, 0.4, 1) both;
+}
+@keyframes dice-hop-a {
+  0% { transform: translate(-40px, -34px) scale(0.85); }
+  35% { transform: translate(0, 0) scale(1); }
+  52% { transform: translate(6px, -12px); }
+  70% { transform: translate(9px, 0); }
+  82% { transform: translate(10px, -3px); }
+  100% { transform: translate(0, 0); }
+}
+@keyframes dice-hop-b {
+  0% { transform: translate(-40px, -34px) scale(0.85); }
+  35% { transform: translate(0, 0) scale(1); }
+  52% { transform: translate(6px, -12px); }
+  70% { transform: translate(9px, 0); }
+  82% { transform: translate(10px, -3px); }
+  100% { transform: translate(0, 0); }
+}
+
+/* Blackjack: kart desteden kayarak gelir ve döner */
+.card-deal {
+  animation: card-deal 420ms cubic-bezier(0.2, 0.8, 0.25, 1) both;
+  transform-origin: 50% 50%;
+}
+@keyframes card-deal {
+  0% { opacity: 0; transform: translate(70px, -40px) rotate(14deg) rotateY(90deg); }
+  55% { opacity: 1; transform: translate(0, 0) rotate(-2deg) rotateY(0deg); }
+  100% { opacity: 1; transform: translate(0, 0) rotate(0) rotateY(0deg); }
+}
+
+/* Piyasa bahsi: süren bahsin kalan süresi */
+.bet-progress {
+  transition: width 1s linear;
+}
+
+/* Sonuç yazısı: yumuşak belirme */
+.result-pop {
+  animation: result-pop 380ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+@keyframes result-pop {
+  0% { opacity: 0; transform: translateY(4px) scale(0.97); }
+  100% { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dice-hop[data-roll],
+  .card-deal,
+  .result-pop {
+    animation: none;
+  }
+}
