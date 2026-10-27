@@ -21,6 +21,7 @@
    - `supabase/migrations/012_kulup_bahis.sql`
    - `supabase/migrations/013_banka_kilit.sql`
    - `supabase/migrations/014_bildirimler.sql` (içindeki `CRON_SECRET_BURAYA` yerine kendi değerini yaz)
+   - `supabase/migrations/015_sirlar_santaj.sql`
 
    Mevcut bir veritabanını güncelliyorsan yalnızca henüz çalıştırmadığın `migrations/` dosyalarını çalıştır.
 2. `.env.example` dosyasını `.env.local` olarak kopyala, Supabase anahtarlarını gir.
@@ -104,6 +105,19 @@ Vercel'e bağla, ortam değişkenlerini ekle: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_
 - Bedel rakibin değerinin %0,4'ü (en az $3.000) × operasyon katsayısı. Başarı ve yakalanma ayrı zarlarla belirlenir. Yakalanan saldırgan itibar −8 kaybeder (PR uzmanı yarıya indirir), haber çıkar ve hedef kimin yaptığını öğrenir; yakalanmazsa hedef yalnızca olanı görür.
 - Sınırlar: saldırgan 6 saatte en fazla 3 operasyon, aynı hedefe 6 saatte 1; son 6 saatte 2 başarılı saldırı alan şirket korunur.
 - Testler için `OPS_TEST_ROLLS` ortam değişkeni zarları sabitler; canlıda tanımlama.
+
+## Sırlar ve şantaj
+
+- `src/lib/game/blackmail.ts` kurallar, `src/lib/server/blackmail.ts` akış, `015_sirlar_santaj.sql` kilitli fonksiyonlar (`blackmail_send`, `blackmail_resolve`).
+- **Sır:** başarıyla örtbas edilen krizler (veri sızıntısı, arızalı parti, gri piyasa parçası, fidye ödemesi), yakalanmadan yürütülen gizli operasyonlar ve şantajın kendisi şirketin sırrı olarak kalır. Ağırlık: hafif / ciddi / yıkıcı. 24 saat taze, sonra değer kaybeder, 72 saatte bayatlar.
+- **Dosya:** yeni gizli operasyon “Özel dedektif tut” rakibin taze bir sırrını bulursa dosyası senin olur; endüstriyel casusluk da %30 olasılıkla bir sır getirir. Dosyanın değeri = hedefin değeri × (%2 / %5 / %10) × tazelik.
+- **Şantaj (profil sayfası):** isimsiz zarf; talep para, kurucu hissesi (kurucu %51'in altına inmez) ya da ihaleden çekilme (yalnızca “İhale zarfını ele geçir” ile öğrenilen ihaleler). Talep dosya değerinin en fazla 3 katı. Gönderirken yakalanma zarı: ağırlık + açgözlülük + aynı hedefe 72 saat içinde ikinci zarf. Yakalanan: itibar −10, ceza, haber, 24 saat yasak.
+- **Hedef (Posta sekmesi), 24 saat:** öde (şantajcıda %30 olasılıkla gizli kopya kalır), reddet (dosya basına sızar: itibar ve PC talebi düşer), ihbar et (sırrı kendin açıklarsın, etki yarıya iner, şantajcı ~%65 yakalanır), karşı tehdit (elinde zarfın sahibine ait dosya varsa iki taraf geri çekilir; bir kez denenir). Yanıtsız kalan zarf ret sayılır.
+- Sınırlar: şantajcı 12 saatte 2 zarf; bir şirkette aynı anda tek açık tehdit; yeni şirketler ilk 48 saat korunur. Testte zarları sabitlemek için `BLACKMAIL_TEST_ROLLS=0|1` (yayında tanımlama).
+
+## Gazete
+
+- `src/lib/server/newspaper.ts`: her gün (İstanbul) bir sayı. O günün haberlerinden en önemlisi manşet olur, diğerleri Ekonomi / Kulis / Teknoloji / Tüketici / Magazin bölümlerine ayrılır. Yan sütunda borsada yükselen-düşenler, sıralamada ilk beş, günün gündemi ve en çok beğenilen oyuncu paylaşımı. Gündem → Gazete; bugün, dün ve 2 gün öncesi.
 
 ## Kulüp (Hayat → Kulüp)
 

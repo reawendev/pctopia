@@ -8,7 +8,7 @@ type OpRow = { id: string; name: string; desc: string; result: string; p: number
 type Data = { ready: boolean; ops: OpRow[]; block: string | null; nextAt: string | null };
 
 /** Profil sayfasında: rakibe karşı gizli operasyonlar. */
-export function Operations({ targetId, targetName, cash, notify }: { targetId: string; targetName: string; cash: number; notify: (m: string) => void }) {
+export function Operations({ targetId, targetName, cash, notify, onRun }: { targetId: string; targetName: string; cash: number; notify: (m: string) => void; onRun?: () => void }) {
   const [d, setD] = useState<Data | null>(null);
   const [busy, setBusy] = useState(false);
   const [last, setLast] = useState<{ text: string; good: boolean } | null>(null);
@@ -24,6 +24,7 @@ export function Operations({ targetId, targetName, cash, notify }: { targetId: s
       const r = await apiFetch<any>("/api/ops", { method: "POST", body: JSON.stringify({ target: targetId, op: o.id }) });
       setD(r);
       setLast({ text: r.message, good: r.result.success && !r.result.caught });
+      onRun?.();
     } catch (e: any) {
       notify(e.message);
     } finally {

@@ -7,6 +7,8 @@ import { Appearance } from "@/components/Appearance";
 import { Club } from "@/components/Club";
 import { Facility } from "@/components/Facility";
 import { Feed } from "@/components/Feed";
+import { Newspaper } from "@/components/Newspaper";
+import { Threats } from "@/components/Threats";
 import { Finance } from "@/components/Finance";
 import { Properties } from "@/components/Properties";
 import { Research } from "@/components/Research";
@@ -90,6 +92,7 @@ const HAYAT_OPTS: [string, string][] = [
   ["kulup", "Kulüp"],
 ];
 const GUNDEM_OPTS: [string, string][] = [
+  ["gazete", "Gazete"],
   ["akis", "Sosyal medya"],
   ["siralama", "Sıralama"],
   ["seref", "Şeref listesi"],
@@ -109,7 +112,7 @@ export default function Oyun() {
   const [tab, setTab] = useState<Tab>("ofis");
   const [dir, setDir] = useState<1 | -1>(1);
   const [subDir, setSubDir] = useState<1 | -1>(1);
-  const [sub, setSub] = useState<{ uretim: "donanim" | "atolye" | "ihale" | "arge"; gundem: "akis" | "siralama" | "seref"; hayat: "iliskiler" | "mulkler" | "kulup" }>({ uretim: "donanim", gundem: "akis", hayat: "iliskiler" });
+  const [sub, setSub] = useState<{ uretim: "donanim" | "atolye" | "ihale" | "arge"; gundem: "gazete" | "akis" | "siralama" | "seref"; hayat: "iliskiler" | "mulkler" | "kulup" }>({ uretim: "donanim", gundem: "gazete", hayat: "iliskiler" });
   const [dealTo, setDealTo] = useState<string | null>(null);
   const [mailTo, setMailTo] = useState<string | null>(null);
   const [world, setWorld] = useState<WorldData | null>(null);
@@ -300,7 +303,8 @@ export default function Oyun() {
   const career = stageFor(state.netWorth);
   const day = dayNumber(company.createdAt, now + skew);
   const serverNow = now + skew;
-  const unread = inbox ? inbox.unread.offers + inbox.unread.messages : 0;
+  const threats = inbox?.threats ?? 0;
+  const unread = inbox ? inbox.unread.offers + inbox.unread.messages + threats : 0;
   const pendingDeals = inbox?.pendingDeals ?? 0;
   const waiting = inbox ? inbox.offers.filter((o) => o.status === "open").length : 0;
   const rep = company.reputation ?? 50;
@@ -535,7 +539,12 @@ export default function Oyun() {
 
         {tab === "borsa" && <Market cash={company.cash} holdings={state.holdings ?? {}} onState={apply} notify={setToast} />}
 
-        {tab === "posta" && <Mailbox composeTo={mailTo} data={inbox} cash={company.cash} now={serverNow} reload={loadInbox} onState={apply} notify={setToast} />}
+        {tab === "posta" && (
+          <div className="space-y-3">
+            <Threats cash={company.cash} now={serverNow} openCount={threats} reload={loadInbox} onState={apply} notify={setToast} />
+            <Mailbox composeTo={mailTo} data={inbox} cash={company.cash} now={serverNow} reload={loadInbox} onState={apply} notify={setToast} />
+          </div>
+        )}
 
         {tab === "finans" && <Finance cash={company.cash} now={serverNow} onState={apply} notify={setToast} pendingDeals={pendingDeals} initialTo={dealTo} />}
 
@@ -560,6 +569,8 @@ export default function Oyun() {
             <div key={sub.gundem} className="page-enter-soft" data-dir={subDir}>
             {sub.gundem === "seref" ? (
               world ? <HallOfFame w={world} /> : <SkeletonCard label="Yükleniyor…" />
+            ) : sub.gundem === "gazete" ? (
+              <Newspaper />
             ) : sub.gundem === "akis" ? (
               <Feed now={serverNow} />
             ) : (

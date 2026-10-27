@@ -212,6 +212,32 @@ export const EVENTS = {
     rep: 2,
     texts: ["{company} Ar-Ge ekibi “{tech}” projesini tamamladı ve patentini aldı.", "Teknoloji yarışında ilk adım {company} şirketinden: “{tech}” patenti onlarda."],
   },
+  // Sırlar ve şantaj (015): itibar ve talep etkisi ayrıca uygulanır
+  scandal: {
+    author: "watchdog",
+    rep: 0,
+    texts: ["{headline}"],
+  },
+  scandal_self: {
+    author: "news",
+    rep: 0,
+    texts: ["{company} kendisine şantaj yapıldığını açıkladı ve dosyayı kamuoyuyla paylaştı: {summary}. Şirket yetkililere başvurdu."],
+  },
+  blackmail_caught: {
+    author: "business",
+    rep: 0,
+    texts: ["Şantajcı yakalandı: {company}, {target} şirketini elindeki dosyayla tehdit ederken suçüstü yakalandı.", "Piyasa Kulisi: {target} şirketine gelen isimsiz tehdit zarfının sahibi {company} çıktı."],
+  },
+  blackmail_unknown: {
+    author: "gossip",
+    rep: 0,
+    texts: ["{target} şirketine gelen isimsiz şantaj zarfı yetkililere teslim edildi. Zarfın sahibi hâlâ bilinmiyor.", "Kulis: {target} şantajcısını ihbar etti ama iz sürülemedi. Sektörde herkes birbirine şüpheyle bakıyor."],
+  },
+  blackmail_standoff: {
+    author: "gossip",
+    rep: 0,
+    texts: ["Kulis: iki şirket birbirinin kirli dosyasını tutuyor. Taraflar şimdilik silahları masaya bıraktı.", "Magazin Ekspres duydu: sektörde bir şantaj girişimi, karşı tehditle sessizce kapandı. İsimler gizli."],
+  },
 } satisfies Record<string, EventDef>;
 
 export type EventId = keyof typeof EVENTS;
@@ -225,7 +251,7 @@ function fill(t: string, vars: Record<string, string | number>): string {
  * Tablo yoksa (göç yapılmadıysa) sessizce geçer.
  */
 export async function postAbout(
-  companyId: string,
+  companyId: string | null,
   event: EventId,
   vars: Record<string, string | number>,
   pressBonus = 0
@@ -233,7 +259,7 @@ export async function postAbout(
   const def: EventDef = EVENTS[event];
   const text = fill(def.texts[Math.floor(Math.random() * def.texts.length)], vars);
   let rep = def.rep > 0 ? def.rep + Math.round(pressBonus) : def.rep;
-  if (rep < 0) {
+  if (rep < 0 && companyId) {
     // Halkla ilişkiler uzmanı olumsuz etkiyi yarıya indirir
     const { data: pr } = await db().from("employees").select("role").eq("company_id", companyId).eq("role", "pr");
     if (pr && pr.length > 0) rep = Math.trunc(rep / 2);
@@ -246,7 +272,7 @@ export async function postAbout(
     if (!isMissingTable(error)) console.error("postAbout", error.message);
     return;
   }
-  if (rep !== 0) {
+  if (rep !== 0 && companyId) {
     const { error: e2 } = await db().rpc("adjust_reputation", { p_company: companyId, p_delta: rep });
     if (e2) console.error("adjust_reputation", e2.message);
   }

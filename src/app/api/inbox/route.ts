@@ -8,6 +8,7 @@ import { syncFacility } from "@/lib/server/facility";
 import { settleMarketBets, syncPools } from "@/lib/server/casino";
 import { offerView, syncOffers, type OfferRow } from "@/lib/server/offers";
 import { markSeen } from "@/lib/server/push";
+import { openThreats, sweepBlackmails } from "@/lib/server/blackmail";
 import { db, handle, HttpError, requireUser } from "@/lib/server/supabase";
 
 export const dynamic = "force-dynamic";
@@ -31,7 +32,8 @@ export const GET = handle(async (req) => {
   const mb = await settleMarketBets(company.id);
   const pools = await syncPools();
   const bets = mb || pools;
-  const financeChanged = fin || tendersChanged || rnd || fac || bets;
+  const swept = await sweepBlackmails().catch(() => false);
+  const financeChanged = fin || tendersChanged || rnd || fac || bets || swept;
   const { changed: offersChanged, ready } = await syncOffers(company, owned, g.netWorth, g.perks);
   const changed = salesChanged || offersChanged || financeChanged;
   if (!ready) {
@@ -74,6 +76,7 @@ export const GET = handle(async (req) => {
     .eq("status", "pending")
     .gt("expires_at", new Date().toISOString());
   const inboxList = ((inbox.data ?? []) as MsgRow[]).map(msgView);
+  const threats = await openThreats(company.id);
 
   await seen;
   return {
@@ -83,6 +86,7 @@ export const GET = handle(async (req) => {
     inbox: inboxList,
     sent: ((sent.data ?? []) as MsgRow[]).map(msgView),
     pendingDeals: pendingDeals ?? 0,
+    threats,
     unread: {
       offers: offerList.filter((o) => !o.read && o.status !== "declined").length,
       messages: inboxList.filter((m) => !m.read).length,

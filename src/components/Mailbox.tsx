@@ -39,6 +39,8 @@ export type InboxData = {
   sent: Message[];
   unread: { offers: number; messages: number };
   pendingDeals?: number;
+  /** yanıt bekleyen şantaj zarfları (015) */
+  threats?: number;
 };
 
 type Item = { kind: "offer"; at: number; offer: Offer } | { kind: "message"; at: number; msg: Message };

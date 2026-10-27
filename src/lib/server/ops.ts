@@ -2,7 +2,9 @@
 
 import { formatMoney } from "../game/economy";
 import { STAFF, type Role } from "../game/finance";
-import { CAUGHT_REP, HITS_PER_TARGET, OP_BY_ID, OP_WINDOW_HOURS, opCost, OPS, OPS_PER_WINDOW, type Op, type OpId } from "../game/ops";
+import { CAUGHT_REP, HITS_PER_TARGET, OP_BY_ID, OP_SECRET, OP_WINDOW_HOURS, opCost, OPS, OPS_PER_WINDOW, SPY_DOSSIER_CHANCE, type Op, type OpId } from "../game/ops";
+import { SEVERITY } from "../game/blackmail";
+import { grabDossier, recordSecret } from "./blackmail";
 import { TECH_BY_ID, TECHS } from "../game/research";
 import { isMissingTable, logEvent } from "./company";
 import { addEffect } from "./effects";
@@ -160,6 +162,17 @@ export async function runOp(attacker: { id: string; name: string; staff: Role[] 
         message = `${t.name}, ${b.tender.buyer} ihalesine birim ${formatMoney(Number(b.unit_price))} teklif vermiş.`;
         break;
       }
+      case "dig": {
+        const found = await grabDossier(attacker.id, t.id);
+        if (found) {
+          detail = { dossier: found.summary, severity: found.severity };
+          await logEvent(attacker.id, "ops", `Dedektif raporu (${t.name}): “${found.summary}”. Dosya elinde (${SEVERITY[found.severity].label}).`);
+          message = `Dedektif bir şey buldu: “${found.summary}”. Dosya artık elinde; Posta sekmesinde ya da bu sayfada kullanabilirsin.`;
+        } else {
+          message = `Dedektif ${t.name} hakkında kullanılabilir bir şey bulamadı. Ya temizler ya da izlerini iyi sildiler.`;
+        }
+        break;
+      }
       case "poach": {
         const role = pre.pick as Role;
         await db().from("employees").delete().eq("company_id", t.id).eq("role", role);
@@ -170,6 +183,14 @@ export async function runOp(attacker: { id: string; name: string; staff: Role[] 
       }
     }
     if (op.id === "smear" || op.id === "reviews") invalidateMarket();
+    // Casusluk: sunuculardan bazen bir sır da çıkar
+    if (op.id === "spy" && Math.random() < SPY_DOSSIER_CHANCE) {
+      const found = await grabDossier(attacker.id, t.id).catch(() => null);
+      if (found) {
+        detail = { ...detail, dossier: found.summary };
+        message += ` Dosyaların arasında bir de sır vardı: “${found.summary}”.`;
+      }
+    }
   } else {
     message = "Operasyon sonuç vermedi.";
   }
@@ -182,6 +203,10 @@ export async function runOp(attacker: { id: string; name: string; staff: Role[] 
     await logEvent(t.id, "crisis", `Hukuk ekibin, ${attacker.name} şirketinin sana karşı “${op.name}” düzenlediğini ortaya çıkardı.`);
     message += ` Ama yakalandın: haber oldu, itibarın ${-rep} düştü.`;
   }
+
+  // Yakalanmadan yapılan kirli iş saldırganın sırrı olarak kalır: başkası onu kazıp şantaj yapabilir
+  const secretKind = OP_SECRET[op.id];
+  if (success && !caught && secretKind) await recordSecret(attacker.id, secretKind, { company: attacker.name, target: t.name });
 
   await db().from("ops_log").update({ success, caught, detail, settled: true }).eq("id", logId);
   await logEvent(attacker.id, "ops", `Gizli operasyon (${t.name}): ${op.name}. ${success ? "Başarılı" : "Başarısız"}${caught ? ", yakalandı" : ""}. Bedel ${formatMoney(row.cost)}.`, -row.cost);

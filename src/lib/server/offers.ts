@@ -10,6 +10,8 @@ import { formatMoney, incomePerHour, type Owned } from "../game/economy";
 import { stageFor } from "../game/stages";
 import { isMissingTable, logEvent } from "./company";
 import { postAbout, type EventId } from "./social";
+import { recordSecret } from "./blackmail";
+import type { SecretKind } from "../game/blackmail";
 import { addEffect, type EffectKind } from "./effects";
 import { effectiveLevel } from "../game/facility";
 import { currentEvent } from "./events";
@@ -363,6 +365,16 @@ async function applyExtras(companyId: string, companyName: string, c: Choice, su
   }
 }
 
+/** Başarıyla örtbas edilen krizler: "şablon:seçenek" → sır türü. */
+const COVER_UPS: Record<string, SecretKind> = {
+  "leak:cover": "leak_cover",
+  "leak:ignore": "leak_hidden",
+  "recall:quiet": "recall_quiet",
+  "recall:ignore": "recall_quiet",
+  "supply:grey": "grey_parts",
+  "ransomware:pay": "ransom_paid",
+};
+
 /** Seçeneği sonuçlandırır (zar atar) ve nakdi atomik olarak değiştirir. */
 async function settle(o: OfferRow, choice: Choice, status: "done" | "expired", companyName: string, press = 0): Promise<boolean> {
   const success = Math.random() < choice.p;
@@ -377,6 +389,9 @@ async function settle(o: OfferRow, choice: Choice, status: "done" | "expired", c
     if (o.template === "ransomware" && amount < 0) await postAbout(o.company_id, "ransomware", { company: companyName }, press);
     await applyExtras(o.company_id, companyName, choice, success, press);
     if (o.template === "tender" && success) await postAbout(o.company_id, "tender_won", { company: companyName }, press);
+    // Örtbas edilen kriz sır bırakır (015): ileride biri dosyasını bulup şantaj yapabilir
+    const hidden = success ? COVER_UPS[`${o.template}:${choice.id}`] : undefined;
+    if (hidden) await recordSecret(o.company_id, hidden, { company: companyName });
   }
   return !!ok;
 }

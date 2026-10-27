@@ -6,6 +6,7 @@ import { Avatar } from "@/components/Avatar";
 import { EquityRow, type EquityListing } from "@/components/Equity";
 import { Feed } from "@/components/Feed";
 import { Operations } from "@/components/Operations";
+import { BlackmailCard } from "@/components/BlackmailCard";
 import { CompanyMark, Portrait } from "@/components/Portrait";
 import type { CharacterSpec, LogoSpec } from "@/lib/game/config";
 import { formatCompactMoney, formatMoney } from "@/lib/game/economy";
@@ -45,6 +46,7 @@ export default function SirketProfili({ params }: { params: { id: string } }) {
   const [now, setNow] = useState(() => Date.now());
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  const [bmKey, setBmKey] = useState(0);
   async function trade(body: object) {
     setBusy(true);
     setMsg("");
@@ -181,7 +183,8 @@ export default function SirketProfili({ params }: { params: { id: string } }) {
             <Feed now={now} scope="company" companyId={c.id} compact />
           </div>
 
-          {!p.isMe && <Operations targetId={c.id} targetName={c.name} cash={p.myCash} notify={setMsg} />}
+          {!p.isMe && <BlackmailCard key={bmKey} targetId={c.id} targetName={c.name} />}
+          {!p.isMe && <Operations targetId={c.id} targetName={c.name} cash={p.myCash} notify={setMsg} onRun={() => setBmKey((k) => k + 1)} />}
         </div>
 
         <aside className="space-y-3">
