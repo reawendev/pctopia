@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { DICE_LABEL, DICE_PAYOUT, MIN_BET, RANKS, RED, ROULETTE_LABEL, SUITS, type Card } from "@/lib/game/casino";
 import { formatMoney } from "@/lib/game/economy";
 import { formatPrice, STOCK_BY_ID } from "@/lib/game/market";
 import { apiFetch } from "@/lib/supabase/client";
 import { SkeletonCard } from "./Skeleton";
+import { RouletteWheel } from "./RouletteWheel";
 
 type Hand = { bet: number; player: Card[]; dealer: Card[]; playerTotal: number; dealerTotal: number; canDouble: boolean };
 type Quote = { id: string; price: number; odds: { minutes: number; up: number; down: number }[] };
@@ -55,11 +56,16 @@ export function Club({ cash, now, onState, notify }: { cash: number; now: number
     return () => clearInterval(t);
   }, [load, notify]);
 
+  // before: sonuç ekrana yansımadan önce beklenecek iş (ör. rulet topu cebe oturana kadar)
   const play = useCallback(
-    async (body: object) => {
+    async (body: object, before?: (r: Data) => Promise<void>) => {
       setBusy(true);
       try {
         const r = await apiFetch<Data>("/api/club", { method: "POST", body: JSON.stringify(body) });
+        if (before) {
+          setLast(null);
+          await before(r);
+        }
         setD(r);
         if ((r as any).state) onState({ ...(r as any).state, journal: (r as any).journal });
         if (r.message) setLast({ text: r.message, good: r.result?.net === undefined ? null : r.result.net > 0 ? true : r.result.net < 0 ? false : null });
@@ -129,7 +135,7 @@ export function Club({ cash, now, onState, notify }: { cash: number; now: number
   );
 }
 
-type Play = (b: object) => Promise<Data | null>;
+type Play = (b: object, before?: (r: Data) => Promise<void>) => Promise<Data | null>;
 
 function BetInput({ id, value, onChange, max }: { id: string; value: string; onChange: (v: string) => void; max: number }) {
   return (
@@ -149,8 +155,27 @@ function Roulette({ cash, max, busy, play }: { cash: number; max: number; busy: 
   const [choice, setChoice] = useState("red");
   const [num, setNum] = useState("17");
   const [last, setLast] = useState<number | null>(null);
+  const [spin, setSpin] = useState<{ id: number; n: number } | null>(null);
+  const landed = useRef<(() => void) | null>(null);
+  // Dönüş sırasında başka bölüme geçilirse sonucu bekletme
+  useEffect(() => () => landed.current?.(), []);
   const b = Number(bet) || 0;
   const c = choice === "number" ? `n${Math.min(36, Math.max(0, Number(num) || 0))}` : choice;
+
+  async function go() {
+    await play({ game: "roulette", bet: b, choice: c }, (r) =>
+      new Promise<void>((resolve) => {
+        const n = r.result?.n;
+        if (typeof n !== "number") return resolve();
+        landed.current = () => {
+          setLast(n);
+          resolve();
+        };
+        setSpin({ id: Date.now(), n });
+      })
+    );
+  }
+
   return (
     <section className="card p-4">
       <div className="flex items-baseline justify-between">
@@ -162,7 +187,10 @@ function Roulette({ cash, max, busy, play }: { cash: number; max: number; busy: 
         )}
       </div>
       <p className="text-xs text-mute">Renk, tek/çift ya da yarım: 2 katı. Tek sayı: 36 katı. Sıfır kasanındır.</p>
-      <div className="mt-3 flex flex-wrap gap-1.5">
+      <div className="my-3 flex justify-center">
+        <RouletteWheel spin={spin} onDone={() => { landed.current?.(); landed.current = null; }} size={232} />
+      </div>
+      <div className="flex flex-wrap gap-1.5">
         {[...Object.entries(ROULETTE_LABEL), ["number", "Sayı"]].map(([k, l]) => (
           <button key={k} type="button" aria-pressed={choice === k} onClick={() => setChoice(k)} className={`rounded border px-2.5 py-1 text-sm ${choice === k ? "border-amber bg-amber/10 text-amber-soft" : "border-line text-mute hover:text-white"}`}>
             {l}
@@ -177,8 +205,8 @@ function Roulette({ cash, max, busy, play }: { cash: number; max: number; busy: 
             <input id="r-num" className="input num !py-2" inputMode="numeric" value={num} onChange={(e) => setNum(e.target.value.replace(/\D/g, "").slice(0, 2))} />
           </div>
         )}
-        <button className="btn btn-primary" disabled={busy || !okBet(b, cash, max)} onClick={async () => { const r = await play({ game: "roulette", bet: b, choice: c }); if (r?.result) setLast(r.result.n); }}>
-          Çevir
+        <button className="btn btn-primary" disabled={busy || !okBet(b, cash, max)} onClick={go}>
+          {spin && busy ? "Dönüyor…" : "Çevir"}
         </button>
       </div>
     </section>

@@ -182,7 +182,7 @@ function Staff({ cash, onState, notify }: { cash: number; onState: OnState; noti
   return (
     <div className="space-y-3">
       <p className="text-sm text-mute">
-        Maaşlar saatlik işler ve kasadan otomatik ödenir; ödenemezse herkes istifa eder. Maaş, saatlik gelirin büyüdükçe artar.
+        Maaşlar saatlik işler ve kasadan otomatik ödenir; ödenemezse herkes istifa eder. Maaş, saatlik gelirin büyüdükçe artar ama gelirden çok daha yavaş.
         {total > 0 && <> Şu anki toplam: <span className="num text-white">{formatMoney(total)}/saat</span>.</>}
       </p>
       <ul className="grid gap-3 sm:grid-cols-2">

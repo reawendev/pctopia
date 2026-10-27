@@ -1,3 +1,4 @@
+import { ROLES, salary, SALARY_KNEE } from "../src/lib/game/finance";
 import assert from "node:assert/strict";
 import {
   appeal, estimateRate, fairValue, isBottlenecked, isValidParts, marketRates, marketShare, pendingSales, performanceScore, priceFactor,
@@ -119,3 +120,14 @@ assert.ok(NPCS.every((n) => /^[a-z]+$/.test(n.id)));
 assert.ok(SLOTS.length === 4);
 
 console.log("rules: tüm testler geçti");
+
+// ---- Maaşlar: gelirle birlikte artar ama giderek yavaşlar ----
+{
+  const payroll = (inc: number) => ROLES.reduce((s, r) => s + salary(r, inc), 0);
+  assert.equal(salary("muhasebeci", 0), 40, "taban maaş");
+  assert.equal(salary("muhasebeci", SALARY_KNEE), 160, "dirsekte eski formülle aynı");
+  assert.ok(payroll(50_000) < payroll(200_000), "gelir artınca maaş yine artar");
+  assert.ok(payroll(50_000) / 50_000 < 0.05, `büyük şirkette bordro gelirin %5'inden az: ${payroll(50_000)}`);
+  assert.ok(payroll(SALARY_KNEE) / SALARY_KNEE <= 0.22 + 1e-9);
+  for (let inc = 0; inc < 300_000; inc += 997) assert.ok(payroll(inc + 997) >= payroll(inc), "monoton");
+}

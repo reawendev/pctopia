@@ -12,9 +12,21 @@ export const STAFF: Record<Role, { name: string; desc: string; base: number; pct
 };
 export const ROLES: Role[] = ["muhasebeci", "sekreter", "satis", "pr"];
 
-/** Saatlik maaş: sabit taban ya da saatlik gelirin bir yüzdesi, hangisi büyükse. */
+/** Bu gelire kadar maaş gelirle birlikte artar; sonrasında karekök eğrisiyle yavaşlar. */
+export const SALARY_KNEE = 2_000;
+
+/** Maaşın baz aldığı gelir: dirseğe kadar aynı, sonra K × √(gelir / K). $50 bin/saat gelirde $10 bin gibi davranır. */
+export function salaryBase(incomePerHour: number): number {
+  const inc = Math.max(0, incomePerHour);
+  return inc <= SALARY_KNEE ? inc : SALARY_KNEE * Math.sqrt(inc / SALARY_KNEE);
+}
+
+/**
+ * Saatlik maaş: sabit taban ya da (yavaşlayan) gelirin bir yüzdesi, hangisi büyükse.
+ * Eskiden gelirin düz yüzdesiydi; büyük şirketlerde dört çalışan gelirin %22'sini yiyordu.
+ */
 export function salary(role: Role, incomePerHour: number): number {
-  return Math.round(Math.max(STAFF[role].base, STAFF[role].pct * incomePerHour));
+  return Math.round(Math.max(STAFF[role].base, STAFF[role].pct * salaryBase(incomePerHour)));
 }
 
 export const ACCOUNTANT_CAP_HOURS = 24;
