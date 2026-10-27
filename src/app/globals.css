@@ -817,3 +817,54 @@ textarea {
 @media (prefers-reduced-motion: reduce) {
   .slot-lamp-run, .slot-lamp-win, .slot-lamp-jackpot, .slot-line-win, .slot-jackpot { animation: none; }
 }
+
+/* ---- Blackjack masası ---- */
+.bj-deal {
+  animation: bj-deal 440ms cubic-bezier(0.2, 0.8, 0.25, 1) both;
+}
+@keyframes bj-deal {
+  0% { opacity: 0; transform: translate(220px, -120px) rotate(28deg) scale(0.8); }
+  60% { opacity: 1; transform: translate(0, 0) rotate(-3deg) scale(1.02); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes bj-flip {
+  0% { transform: rotateY(0deg) translateY(0); }
+  45% { transform: rotateY(90deg) translateY(-8px) scale(1.06); }
+  100% { transform: rotateY(180deg) translateY(0); }
+}
+.bj-chips { transition: transform 600ms cubic-bezier(0.3, 0.7, 0.3, 1), opacity 600ms; }
+.bj-chips-lose { transform: translateY(-70px) scale(0.8); opacity: 0; }
+.bj-chips-win { transform: translateY(10px) scale(1.05); }
+.bj-chips-push { animation: bj-push 500ms ease-in-out 2 alternate; }
+@keyframes bj-push { to { transform: scale(1.12); } }
+.bj-chip-pay { animation: bj-chip-pay 520ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+@keyframes bj-chip-pay {
+  0% { opacity: 0; transform: translateY(-80px); }
+  100% { opacity: 1; transform: none; }
+}
+.bj-banner { animation: bj-banner 2.2s cubic-bezier(0.2, 0.9, 0.3, 1.3) both; }
+@keyframes bj-banner {
+  0% { opacity: 0; transform: scale(0.5) rotate(-4deg); }
+  18% { opacity: 1; transform: scale(1.08) rotate(1deg); }
+  28% { transform: scale(1) rotate(0); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: scale(0.96); }
+}
+
+/* ---- Plinko ---- */
+.plinko-peg-hit { animation: plinko-peg 420ms ease-out both; }
+@keyframes plinko-peg {
+  0% { fill: #fff6d6; }
+  100% { fill: #c9a24a; }
+}
+.plinko-bin-hit { animation: plinko-bin 600ms cubic-bezier(0.2, 0.9, 0.3, 1.4) both; }
+@keyframes plinko-bin {
+  0% { transform: translateY(0) scale(1); }
+  35% { transform: translateY(5px) scale(1.12); }
+  100% { transform: translateY(0) scale(1.06); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bj-deal, .bj-chips-push, .bj-chip-pay, .bj-banner, .plinko-peg-hit, .plinko-bin-hit { animation: none; }
+  .bj-chips { transition: none; }
+}

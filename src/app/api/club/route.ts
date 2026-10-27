@@ -1,7 +1,7 @@
 import { isRouletteBet, type DiceBet } from "@/lib/game/casino";
 import { formatMoney } from "@/lib/game/economy";
 import {
-  blackjack, clubSummary, loadHand, marketQuotes, placeMarketBet, placePoolBet, playDice, playSlot, playSpin, playRoulette, poolsView, settleMarketBets, syncPools, type Player,
+  blackjack, clubSummary, loadHand, marketQuotes, placeMarketBet, placePoolBet, playDice, playPlinko, playSlot, playSpin, playRoulette, poolsView, settleMarketBets, syncPools, type Player,
 } from "@/lib/server/casino";
 import { loadCompany, loadJournal, view } from "@/lib/server/company";
 import { invalidateEquity } from "@/lib/server/equity";
@@ -64,6 +64,13 @@ export const POST = handle(async (req) => {
       const r = await playRoulette(p, Number(body.bet), body.choice);
       result = r;
       message = r.net > 0 ? `Top ${r.n} numarada durdu. ${formatMoney(r.net)} kazandın.` : `Top ${r.n} numarada durdu. Kaybettin.`;
+      break;
+    }
+    case "plinko": {
+      const risk = body.risk === "high" ? "high" : "low";
+      const r = await playPlinko(p, Number(body.bet), risk);
+      result = r;
+      message = r.net > 0 ? `Top ×${r.mult.toLocaleString("tr-TR")} kutusuna düştü. ${formatMoney(r.net)} kazandın.` : r.net === 0 ? "Top ×1 kutusuna düştü. Bahsin geri geldi." : `Top ×${r.mult.toLocaleString("tr-TR")} kutusuna düştü. ${formatMoney(-r.net)} kaybettin.`;
       break;
     }
     case "slot": {

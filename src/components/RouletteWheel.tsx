@@ -102,7 +102,7 @@ export function RouletteWheel({ spin, onDone, size = 220 }: { spin: { id: number
     spinning.current = true;
     const start = performance.now();
     const frame = (now: number) => {
-      const t = Math.min(1, (now - start) / SPIN_MS);
+      const t = Math.min(1, Math.max(0, (now - start) / SPIN_MS));
       const wheel = w0 + (w1 - w0) * easeOutCubic(t);
       const ball = b0 - travel * easeOutQuart(t);
       // Yarıçap: %55'e kadar olukta, sonra cebe süzülür; düşerken iki kez seker

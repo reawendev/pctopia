@@ -155,3 +155,14 @@ console.log("rules: tüm testler geçti");
   assert.equal(slotSymbolAt(0), "seven");
   assert.equal(slotSymbolAt(SLOT_TOTAL_WEIGHT - 1), "lemon");
 }
+
+// ---- Plinko ----
+{
+  const { plinkoRtp, plinkoBin, PLINKO_MULTS, PLINKO_ROWS } = require("../src/lib/game/casino");
+  for (const r of ["low", "high"]) {
+    assert.equal(PLINKO_MULTS[r].length, PLINKO_ROWS + 1);
+    assert.ok(plinkoRtp(r) > 0.94 && plinkoRtp(r) < 0.97, `plinko ${r} ${plinkoRtp(r)}`);
+    assert.deepEqual([...PLINKO_MULTS[r]].reverse(), PLINKO_MULTS[r], "simetrik");
+  }
+  assert.equal(plinkoBin([1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1]), 4);
+}

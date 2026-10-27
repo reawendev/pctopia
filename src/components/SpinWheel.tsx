@@ -68,7 +68,7 @@ export function SpinWheel({ spin, onDone, size = 240 }: { spin: { id: number; in
     let kick = 0;
     const start = performance.now();
     const frame = (now: number) => {
-      const t = Math.min(1, (now - start) / SPIN_WHEEL_MS);
+      const t = Math.min(1, Math.max(0, (now - start) / SPIN_WHEEL_MS));
       const a = a0 + (a1 - a0) * ease(t);
       angle.current = a;
       set(a);

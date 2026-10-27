@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { DICE_LABEL, DICE_PAYOUT, MIN_BET, RANKS, RED, ROULETTE_LABEL, SLOT_RTP, SLOT_THREE, SLOT_TWO_CHERRIES, SLOT_TWO_SEVENS, SPIN_RTP, SPIN_SEGMENTS, SUITS, type Card, type SlotSymbol } from "@/lib/game/casino";
+import { DICE_LABEL, DICE_PAYOUT, MIN_BET, RANKS, RED, ROULETTE_LABEL, PLINKO_LABEL, plinkoRtp, SLOT_RTP, SLOT_THREE, type PlinkoRisk, SLOT_TWO_CHERRIES, SLOT_TWO_SEVENS, SPIN_RTP, SPIN_SEGMENTS, SUITS, type Card, type SlotSymbol } from "@/lib/game/casino";
 import { formatMoney } from "@/lib/game/economy";
 import { formatPrice, STOCK_BY_ID } from "@/lib/game/market";
 import { apiFetch } from "@/lib/supabase/client";
@@ -10,6 +10,8 @@ import { RouletteWheel } from "./RouletteWheel";
 import { SpinWheel, label as spinLabel } from "./SpinWheel";
 import { Dice3D, DICE_MS } from "./Dice3D";
 import { SlotMachine, Symbol as SlotIcon } from "./SlotMachine";
+import { BlackjackTable, tableSettleMs, type BjOutcome } from "./BlackjackTable";
+import { PlinkoBoard } from "./PlinkoBoard";
 
 type Hand = { bet: number; player: Card[]; dealer: Card[]; playerTotal: number; dealerTotal: number; canDouble: boolean };
 type Quote = { id: string; price: number; odds: { minutes: number; up: number; down: number }[] };
@@ -128,10 +130,9 @@ export function Club({ cash, now, onState, notify }: { cash: number; now: number
           <Roulette cash={cash} max={d.summary.maxBet} busy={busy} play={play} />
           <Spin cash={cash} max={d.summary.maxBet} busy={busy} play={play} />
           <Slot cash={cash} max={d.summary.maxBet} busy={busy} play={play} />
+          <Plinko cash={cash} max={d.summary.maxBet} busy={busy} play={play} />
+          <Blackjack hand={d.hand} cash={cash} max={d.summary.maxBet} busy={busy} play={play} />
           <Dice cash={cash} max={d.summary.maxBet} busy={busy} play={play} />
-          <div className="lg:col-span-2">
-            <Blackjack hand={d.hand} cash={cash} max={d.summary.maxBet} busy={busy} play={play} />
-          </div>
         </div>
       )}
       {sec === "piyasa" && <MarketBets quotes={d.quotes} bets={d.marketBets} cash={cash} max={d.summary.maxBet} busy={busy} play={play} now={now} />}
@@ -212,6 +213,65 @@ function Roulette({ cash, max, busy, play }: { cash: number; max: number; busy: 
         )}
         <button className="btn btn-primary" disabled={busy || !okBet(b, cash, max)} onClick={go}>
           {spin && busy ? "Dönüyor…" : "Çevir"}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+// ---------------- Plinko ----------------
+
+function Plinko({ cash, max, busy, play }: { cash: number; max: number; busy: boolean; play: Play }) {
+  const [bet, setBet] = useState("1000");
+  const [risk, setRisk] = useState<PlinkoRisk>("low");
+  const [drop, setDrop] = useState<{ id: number; path: number[]; bin: number } | null>(null);
+  const [last, setLast] = useState<number | null>(null);
+  const landed = useRef<(() => void) | null>(null);
+  useEffect(() => () => landed.current?.(), []);
+  const b = Number(bet) || 0;
+  const dropping = !!landed.current;
+
+  async function go() {
+    setLast(null);
+    await play({ game: "plinko", bet: b, risk }, (r) =>
+      new Promise<void>((resolve) => {
+        const path = r.result?.path;
+        if (!Array.isArray(path)) return resolve();
+        landed.current = () => {
+          setLast(r.result.mult);
+          resolve();
+        };
+        setDrop({ id: Date.now(), path, bin: r.result.bin });
+      })
+    );
+  }
+
+  return (
+    <section className="card p-4">
+      <div className="flex items-baseline justify-between">
+        <h3 className="heading text-lg">Plinko</h3>
+        {last !== null && <span className={`num result-pop text-sm font-semibold ${last > 1 ? "text-gain" : last === 1 ? "text-white" : "text-loss"}`}>×{last.toLocaleString("tr-TR")}</span>}
+      </div>
+      <p className="text-xs text-mute">
+        Topu bırak, çivilere çarpa çarpa bir kutuya düşsün. Kenarlar çok öder ama oraya düşmek zordur. Riskli modda kenarlar ×155'e kadar çıkar, ortası daha çok yakar. Uzun vadede bahsin %{Math.round(plinkoRtp(risk) * 1000) / 10}'i geri döner.
+      </p>
+      <div className="my-3">
+        <PlinkoBoard drop={drop} risk={risk} onDone={() => { landed.current?.(); landed.current = null; }} />
+      </div>
+      <div className="flex flex-wrap items-end gap-2">
+        <div>
+          <span className="label">Mod</span>
+          <div className="flex gap-1.5">
+            {(Object.keys(PLINKO_LABEL) as PlinkoRisk[]).map((k) => (
+              <button key={k} type="button" aria-pressed={risk === k} disabled={busy} onClick={() => setRisk(k)} className={`rounded border px-2.5 py-2 text-sm ${risk === k ? "border-amber bg-amber/10 text-amber-soft" : "border-line text-mute hover:text-white"}`}>
+                {PLINKO_LABEL[k]}
+              </button>
+            ))}
+          </div>
+        </div>
+        <BetInput id="pk-bet" value={bet} onChange={setBet} max={max} />
+        <button className="btn btn-primary" disabled={busy || !okBet(b, cash, max)} onClick={go}>
+          {dropping && busy ? "Düşüyor…" : "Bırak"}
         </button>
       </div>
     </section>
@@ -390,95 +450,46 @@ function Dice({ cash, max, busy, play }: { cash: number; max: number; busy: bool
 
 // ---------------- Blackjack ----------------
 
-const DEAL_GAP = 230; // kartlar arası dağıtım aralığı (ms)
-
-function CardFace({ c, hidden, delay }: { c?: Card; hidden?: boolean; delay?: number }) {
-  const anim = delay !== undefined ? { className: "card-deal", style: { animationDelay: `${delay}ms` } } : { className: "", style: undefined };
-  if (hidden || !c)
-    return (
-      <span className={`flex h-14 w-10 items-center justify-center rounded border border-amber/40 bg-[repeating-linear-gradient(45deg,#1B2C44_0_4px,#22365A_4px_8px)] text-amber/70 ${anim.className}`} style={anim.style} aria-label="Kapalı kart">
-        ✦
-      </span>
-    );
-  const red = c.s === 1 || c.s === 2;
-  return (
-    <span className={`flex h-14 w-10 flex-col items-center justify-center rounded border border-white/70 bg-white font-semibold shadow-[0_2px_4px_rgba(0,0,0,0.35)] ${red ? "text-red-700" : "text-ink"} ${anim.className}`} style={anim.style} aria-label={`${RANKS[c.r]} ${SUITS[c.s]}`}>
-      <span className="text-sm leading-none">{RANKS[c.r]}</span>
-      <span className="text-base leading-none">{SUITS[c.s]}</span>
-    </span>
-  );
-}
-
 function Blackjack({ hand, cash, max, busy, play }: { hand: Hand | null; cash: number; max: number; busy: boolean; play: Play }) {
   const [bet, setBet] = useState("1000");
   const [shown, setShown] = useState<Hand | null>(null); // biten elin son hali
-  // Yanıt geldiği an yeni kartları göster (sonuç yazısı ve kasa, kartlar inene kadar bekler)
+  // Yanıt geldiği an yeni kartları göster; sonuç yazısı, fişler ve kasa kartlar inene kadar bekler
   const [pending, setPending] = useState<{ hand: Hand; live: boolean } | null>(null);
+  const [outcome, setOutcome] = useState<BjOutcome>(null);
+  const [settled, setSettled] = useState(false);
   const b = Number(bet) || 0;
   const h = pending?.hand ?? hand ?? shown;
   const live = pending ? pending.live : !!hand;
 
-  // Her kart ilk göründüğü anda bir dağıtım gecikmesi alır ve onu korur: animasyon yalnızca kart masaya
-  // ilk konduğunda oynar, sonraki render'larda (saat her saniye ilerliyor) yeniden başlamaz.
-  const seen = useRef({ player: 0, dealer: 0 });
-  const delays = useRef<Record<string, number>>({});
-  const dealerCount = h ? h.dealer.length : 0;
-  const playerCount = h ? h.player.length : 0;
-  if (h) {
-    // Yeni kartlar sırayla: oyuncu, krupiye, oyuncu, krupiye…
-    let k = 0;
-    for (let i = 0; i < Math.max(playerCount, dealerCount); i++) {
-      if (i < playerCount && delays.current[`p${i}`] === undefined) delays.current[`p${i}`] = k++ * DEAL_GAP;
-      if (i < dealerCount && delays.current[`d${i}`] === undefined) delays.current[`d${i}`] = k++ * DEAL_GAP;
-    }
-    if (live && delays.current.hidden === undefined) delays.current.hidden = k++ * DEAL_GAP;
-  }
-  const delayOf = (who: "p" | "d", i: number) => delays.current[`${who}${i}`];
-  const hiddenDelay = delays.current.hidden;
-  useEffect(() => {
-    seen.current = { player: playerCount, dealer: dealerCount };
-  });
-
-  /** Sonuç yazısı, son kart masaya inince gelsin. */
-  async function act(body: object) {
-    const before = seen.current;
-    const r = await play(body, (res) => {
+  async function act(body: object, fresh = false) {
+    const before = { player: fresh ? 0 : h?.player.length ?? 0, dealer: fresh ? 0 : h?.dealer.length ?? 0, live };
+    await play(body, (res) => {
       const nh: Hand | undefined = res.result?.hand ?? undefined;
       if (!nh) return Promise.resolve();
       const done = !!res.result?.done;
-      const fresh = Math.max(0, nh.player.length - before.player) + Math.max(0, nh.dealer.length - before.dealer);
-      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       if (done) setShown(nh);
       setPending({ hand: nh, live: !done });
-      return new Promise<void>((ok) => setTimeout(ok, reduce || !fresh ? 0 : fresh * DEAL_GAP + 300));
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      return new Promise<void>((ok) =>
+        setTimeout(() => {
+          if (done) {
+            setOutcome({ net: Number(res.result.net ?? 0), text: String(res.result.result ?? "") });
+            setSettled(true);
+          }
+          ok();
+        }, reduce ? 0 : tableSettleMs(before, nh, !done))
+      );
     });
     setPending(null);
-    return r;
   }
 
   return (
     <section className="card p-4">
       <h3 className="heading text-lg">Blackjack</h3>
       <p className="text-xs text-mute">21'e en yakın olan kazanır. Krupiye 17'de durur, blackjack 3'e 2 öder. İlk iki kartta bahsi ikiye katlayabilirsin.</p>
-      {h && (
-        <div className="mt-3 grid gap-3 rounded-md bg-[radial-gradient(ellipse_at_center,#1F4A33_0%,#163626_75%)] p-3 ring-1 ring-inset ring-black/30 sm:grid-cols-2">
-          <div>
-            <div className="text-xs text-white/70">Krupiye{!live ? `: ${h.dealerTotal}` : ""}</div>
-            <div className="mt-1 flex gap-1.5" style={{ perspective: 600 }}>
-              {h.dealer.map((c, i) => <CardFace key={i} c={c} delay={delayOf("d", i)} />)}
-              {live && <CardFace hidden delay={hiddenDelay} />}
-            </div>
-          </div>
-          <div>
-            <div className="text-xs text-white/70">
-              Sen: <span className="num text-white">{h.playerTotal}</span>, bahis {formatMoney(h.bet)}
-            </div>
-            <div className="mt-1 flex flex-wrap gap-1.5" style={{ perspective: 600 }}>
-              {h.player.map((c, i) => <CardFace key={i} c={c} delay={delayOf("p", i)} />)}
-            </div>
-          </div>
-        </div>
-      )}
+      <div className="mt-3">
+        <BlackjackTable hand={h} live={live} outcome={outcome} settled={settled} />
+      </div>
       <div className="mt-3 flex flex-wrap items-end gap-2">
         {live ? (
           <>
@@ -488,8 +499,8 @@ function Blackjack({ hand, cash, max, busy, play }: { hand: Hand | null; cash: n
             <button className="btn" disabled={busy} onClick={() => act({ game: "blackjack", action: "stand" })}>
               Dur
             </button>
-            {hand!.canDouble && (
-              <button className="btn" disabled={busy || cash < hand!.bet} onClick={() => act({ game: "blackjack", action: "double" })}>
+            {(pending?.hand ?? hand)?.canDouble && (
+              <button className="btn" disabled={busy || cash < (h?.bet ?? 0)} onClick={() => act({ game: "blackjack", action: "double" })}>
                 İkiye katla
               </button>
             )}
@@ -502,12 +513,12 @@ function Blackjack({ hand, cash, max, busy, play }: { hand: Hand | null; cash: n
               disabled={busy || !okBet(b, cash, max)}
               onClick={() => {
                 setShown(null);
-                seen.current = { player: 0, dealer: 0 };
-                delays.current = {};
-                act({ game: "blackjack", action: "deal", bet: b });
+                setOutcome(null);
+                setSettled(false);
+                act({ game: "blackjack", action: "deal", bet: b }, true);
               }}
             >
-              Kart dağıt
+              {h ? "Yeni el" : "Kart dağıt"}
             </button>
           </>
         )}

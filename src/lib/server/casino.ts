@@ -3,7 +3,7 @@
 import { randomInt } from "node:crypto";
 import {
   blackjackResult, dicePayout, handValue, isBlackjack, LEADER_CLOSE_HOURS, LEADER_HOUR_UTC, LOSS_LOVE, LOSS_NEWS_MIN, LOSS_NEWS_RATIO,
-  LOSS_REP, MARKET_HORIZONS, maxBet, MIN_BET, oddsFor, roulettePayout, SPIN_SEGMENTS, spinPayout, SLOT_TOTAL_WEIGHT, slotPayout, slotSymbolAt, type Card, type DiceBet, type RouletteBet,
+  LOSS_REP, MARKET_HORIZONS, maxBet, MIN_BET, oddsFor, roulettePayout, SPIN_SEGMENTS, spinPayout, SLOT_TOTAL_WEIGHT, slotPayout, slotSymbolAt, PLINKO_MULTS, PLINKO_ROWS, plinkoBin, type PlinkoRisk, type Card, type DiceBet, type RouletteBet,
 } from "../game/casino";
 import { formatMoney } from "../game/economy";
 import { STOCK_BY_ID, TICK_MS } from "../game/market";
@@ -92,6 +92,17 @@ export async function playSlot(p: Player, betRaw: number) {
   await apply(p.id, bet, payout);
   await record(p, "slot", bet, payout, { reels, mult });
   return { reels, mult, payout, net: payout - bet };
+}
+
+export async function playPlinko(p: Player, betRaw: number, risk: PlinkoRisk) {
+  const bet = await checkBet(p, betRaw);
+  const path = Array.from({ length: PLINKO_ROWS }, () => randomInt(0, 2));
+  const bin = plinkoBin(path);
+  const mult = PLINKO_MULTS[risk][bin];
+  const payout = Math.floor(bet * mult);
+  await apply(p.id, bet, payout);
+  await record(p, "plinko", bet, payout, { risk, path, bin, mult });
+  return { path, bin, mult, risk, payout, net: payout - bet };
 }
 
 export async function playDice(p: Player, betRaw: number, choice: DiceBet) {

@@ -155,3 +155,28 @@ export const SLOT_RTP = (() => {
   }
   return ev;
 })();
+
+// ---- Plinko (12 sıra çivi; top her sırada sağa ya da sola düşer, bin = sağa düşme sayısı) ----
+export const PLINKO_ROWS = 12;
+export type PlinkoRisk = "low" | "high";
+/** Kutu çarpanları (soldan sağa, 13 kutu). Geri ödeme: dengeli ≈ %95,9, riskli ≈ %95,3. */
+export const PLINKO_MULTS: Record<PlinkoRisk, number[]> = {
+  low: [9, 3, 1.6, 1.3, 1.1, 0.95, 0.5, 0.95, 1.1, 1.3, 1.6, 3, 9],
+  high: [155, 21, 7.7, 2, 0.7, 0.2, 0.2, 0.2, 0.7, 2, 7.7, 21, 155],
+};
+export const PLINKO_LABEL: Record<PlinkoRisk, string> = { low: "Dengeli", high: "Riskli" };
+
+/** Yol: her sıra için 0 (sol) ya da 1 (sağ). Kutu = sağa düşme sayısı. */
+export function plinkoBin(path: number[]): number {
+  return path.reduce((s, x) => s + (x ? 1 : 0), 0);
+}
+
+export function plinkoRtp(risk: PlinkoRisk): number {
+  let c = 1;
+  let ev = 0;
+  for (let k = 0; k <= PLINKO_ROWS; k++) {
+    if (k > 0) c = (c * (PLINKO_ROWS - k + 1)) / k;
+    ev += (PLINKO_MULTS[risk][k] * c) / 2 ** PLINKO_ROWS;
+  }
+  return ev;
+}
