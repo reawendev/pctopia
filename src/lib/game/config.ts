@@ -41,12 +41,26 @@ export const LOGO_COLORS = ["#f2b441", "#4ade80", "#38bdf8", "#f87171", "#a78bfa
 export const LOGO_BG = ["#0f172a", "#111827", "#1e293b", "#1c1917", "#022c22", "#1e1b4b", "#450a0a", "#ffffff"] as const;
 
 export const SKINS = ["#f1d3b8", "#e0b48c", "#c68b5f", "#8d5a3b", "#5b3a29"] as const;
-export const HAIR_STYLES = ["short", "side", "long", "bald"] as const;
+export const HAIR_STYLES = ["short", "side", "slick", "undercut", "curly", "wavy", "afro", "long", "bob", "bun", "ponytail", "bald"] as const;
 export const HAIR_COLORS = ["#1a1411", "#4a2f1b", "#8a5a2b", "#c9a15a", "#9ca3af", "#7c2d12"] as const;
 export const SUITS = ["#1f2937", "#0f2a43", "#3b1d2a", "#14352a", "#44403c"] as const;
+/** Eski tek seçimli ayrıntı (eski kayıtlar için). Yeni ekran yüz kılı ve gözlüğü ayrı seçer. */
 export const ACCESSORIES = ["none", "glasses", "beard"] as const;
 export const GENDERS = ["man", "woman"] as const;
 export const AGES = ["young", "middle", "senior"] as const;
+// Yüz
+export const EYES = ["round", "almond", "narrow", "sleepy"] as const;
+export const BROWS = ["soft", "arched", "thick", "straight"] as const;
+export const MOUTHS = ["smile", "grin", "neutral", "smirk"] as const;
+// Aksesuar
+export const FACIAL = ["none", "stubble", "mustache", "goatee", "beard"] as const;
+export const EYEWEAR = ["none", "glasses", "round", "sunglasses"] as const;
+export const HEADWEAR = ["none", "beanie", "cap", "fedora", "headphones"] as const;
+export const EARRINGS = ["none", "stud", "hoop"] as const;
+// Kıyafet ve arka plan
+export const OUTFITS = ["suit", "bowtie", "blazer", "turtleneck", "shirt", "hoodie"] as const;
+export const TIE_COLORS = ["#7f1d1d", "#1e3a8a", "#a16207", "#14532d", "#111827", "#9d174d"] as const;
+export const BACKDROPS = ["dark", "office", "city", "brass", "teal", "wine"] as const;
 
 export type LogoSpec = {
   shape: (typeof LOGO_SHAPES)[number];
@@ -61,10 +75,28 @@ export type CharacterSpec = {
   hairColor: string;
   suit: string;
   accessory: (typeof ACCESSORIES)[number];
-  // Sonradan eklendi; eski kayıtlarda olmayabilir
+  // Sonradan eklendi; eski kayıtlarda olmayabilir (yoksa varsayılan çizilir)
   gender?: (typeof GENDERS)[number];
   age?: (typeof AGES)[number];
+  eyes?: (typeof EYES)[number];
+  brows?: (typeof BROWS)[number];
+  mouth?: (typeof MOUTHS)[number];
+  facial?: (typeof FACIAL)[number];
+  eyewear?: (typeof EYEWEAR)[number];
+  headwear?: (typeof HEADWEAR)[number];
+  earring?: (typeof EARRINGS)[number];
+  outfit?: (typeof OUTFITS)[number];
+  tie?: string;
+  backdrop?: (typeof BACKDROPS)[number];
 };
+
+/** Eski "ayrıntı" alanı yeni alanlara çevrilir: gözlük ve sakal ayrı ayrı seçilebilir. */
+export function facialOf(c: CharacterSpec): (typeof FACIAL)[number] {
+  return c.facial ?? (c.accessory === "beard" ? "beard" : "none");
+}
+export function eyewearOf(c: CharacterSpec): (typeof EYEWEAR)[number] {
+  return c.eyewear ?? (c.accessory === "glasses" ? "glasses" : "none");
+}
 
 export const DEFAULT_LOGO: LogoSpec = { shape: "hex", symbol: "chip", color: LOGO_COLORS[0], bg: LOGO_BG[0] };
 export const DEFAULT_CHARACTER: CharacterSpec = {
@@ -75,6 +107,16 @@ export const DEFAULT_CHARACTER: CharacterSpec = {
   accessory: "none",
   gender: "man",
   age: "middle",
+  eyes: "almond",
+  brows: "soft",
+  mouth: "smile",
+  facial: "none",
+  eyewear: "none",
+  headwear: "none",
+  earring: "none",
+  outfit: "suit",
+  tie: TIE_COLORS[0],
+  backdrop: "office",
 };
 
 export function isValidLogo(x: any): x is LogoSpec {
@@ -87,6 +129,9 @@ export function isValidLogo(x: any): x is LogoSpec {
   );
 }
 
+/** İsteğe bağlı alan: yoksa geçerli, varsa listede olmalı. */
+const opt = (v: unknown, list: readonly string[]) => v === undefined || (typeof v === "string" && list.includes(v));
+
 export function isValidCharacter(x: any): x is CharacterSpec {
   return (
     x &&
@@ -95,7 +140,17 @@ export function isValidCharacter(x: any): x is CharacterSpec {
     (HAIR_COLORS as readonly string[]).includes(x.hairColor) &&
     (SUITS as readonly string[]).includes(x.suit) &&
     (ACCESSORIES as readonly string[]).includes(x.accessory) &&
-    (x.gender === undefined || (GENDERS as readonly string[]).includes(x.gender)) &&
-    (x.age === undefined || (AGES as readonly string[]).includes(x.age))
+    opt(x.gender, GENDERS) &&
+    opt(x.age, AGES) &&
+    opt(x.eyes, EYES) &&
+    opt(x.brows, BROWS) &&
+    opt(x.mouth, MOUTHS) &&
+    opt(x.facial, FACIAL) &&
+    opt(x.eyewear, EYEWEAR) &&
+    opt(x.headwear, HEADWEAR) &&
+    opt(x.earring, EARRINGS) &&
+    opt(x.outfit, OUTFITS) &&
+    opt(x.tie, TIE_COLORS) &&
+    opt(x.backdrop, BACKDROPS)
   );
 }

@@ -1,6 +1,6 @@
 // Oyuncu seçimlerini PixelLab tariflerine çevirir (İngilizce, model en iyi böyle anlıyor).
 
-import type { CharacterSpec, LogoSpec } from "./config";
+import { eyewearOf, facialOf, type CharacterSpec, type LogoSpec } from "./config";
 
 const SKIN: Record<string, string> = {
   "#f1d3b8": "fair skin",
@@ -61,23 +61,64 @@ const SYMBOL: Record<LogoSpec["symbol"], string> = {
   ring: "a concentric ring",
 };
 
+const HAIR_STYLE: Record<CharacterSpec["hair"], string> = {
+  short: "short neat",
+  side: "side-parted",
+  slick: "slicked-back",
+  undercut: "undercut with short sides and longer top",
+  curly: "short curly",
+  wavy: "shoulder-length wavy",
+  afro: "voluminous afro",
+  long: "long straight",
+  bob: "chin-length bob with bangs",
+  bun: "tied in a top bun",
+  ponytail: "pulled back into a ponytail",
+  bald: "",
+};
+const EXPRESSION: Record<string, string> = { smile: "warm confident smile", grin: "broad grin", neutral: "calm serious expression", smirk: "subtle smirk" };
+const EYES_TXT: Record<string, string> = { round: "round eyes", almond: "almond-shaped eyes", narrow: "narrow eyes", sleepy: "heavy-lidded eyes" };
+const FACIAL_TXT: Record<string, string> = { stubble: "light stubble", mustache: "a mustache", goatee: "a goatee", beard: "a well-groomed beard" };
+const EYEWEAR_TXT: Record<string, string> = { glasses: "rectangular glasses", round: "round gold-rimmed glasses", sunglasses: "dark sunglasses" };
+const HEADWEAR_TXT: Record<string, string> = { beanie: "a knit beanie", cap: "a baseball cap", fedora: "a fedora hat", headphones: "headphones around the head" };
+const EARRING_TXT: Record<string, string> = { stud: "small gold stud earrings", hoop: "gold hoop earrings" };
+const OUTFIT_TXT: Record<string, (c: string, tie: string) => string> = {
+  suit: (c, tie) => `a ${c} with white shirt and ${tie} tie`,
+  bowtie: (c, tie) => `a ${c} with white shirt and ${tie} bow tie`,
+  blazer: (c) => `a ${c.replace(" suit", "")} blazer over a white t-shirt`,
+  turtleneck: (c) => `a ${c.replace(" suit", "")} turtleneck sweater`,
+  shirt: (c) => `a ${c.replace(" suit", "")} button-up shirt with open collar`,
+  hoodie: (c) => `a ${c.replace(" suit", "")} hoodie`,
+};
+const TIE_TXT: Record<string, string> = { "#7f1d1d": "dark red", "#1e3a8a": "royal blue", "#a16207": "mustard", "#14532d": "dark green", "#111827": "black", "#9d174d": "magenta" };
+const BACKDROP_TXT: Record<string, string> = {
+  dark: "dark plain background",
+  office: "executive office background with window blinds and bookshelf",
+  city: "night city skyline background",
+  brass: "warm golden gradient background",
+  teal: "deep teal gradient background",
+  wine: "deep burgundy gradient background",
+};
+
 export function portraitPrompt(c: CharacterSpec): { description: string; negative: string } {
-  const gender = c.gender === "woman" ? "businesswoman" : "businessman";
+  const woman = c.gender === "woman";
+  const gender = woman ? "businesswoman" : "businessman";
   const age = c.age === "young" ? "young adult" : c.age === "senior" ? "senior, around 60 years old" : "middle-aged";
-  const hair =
-    c.hair === "bald"
-      ? "bald head"
-      : c.hair === "long"
-      ? `long ${HAIR_COLOR[c.hairColor] ?? "dark"} hair`
-      : c.hair === "side"
-      ? `${HAIR_COLOR[c.hairColor] ?? "dark"} side-parted hair`
-      : `short ${HAIR_COLOR[c.hairColor] ?? "dark"} hair`;
-  const extra = c.accessory === "glasses" ? ", wearing thin-rimmed glasses" : c.accessory === "beard" ? `, well-groomed ${HAIR_COLOR[c.hairColor] ?? "dark"} beard` : "";
+  const color = c.age === "senior" ? "grey" : HAIR_COLOR[c.hairColor] ?? "dark";
+  const hair = c.hair === "bald" ? "bald head" : `${color} hair, ${HAIR_STYLE[c.hair] ?? "short"}`;
+  const facial = facialOf(c);
+  const eyewear = eyewearOf(c);
+  const extras = [
+    facial !== "none" ? FACIAL_TXT[facial] : "",
+    eyewear !== "none" ? `wearing ${EYEWEAR_TXT[eyewear]}` : "",
+    c.headwear && c.headwear !== "none" ? `wearing ${HEADWEAR_TXT[c.headwear]}` : "",
+    c.earring && c.earring !== "none" ? EARRING_TXT[c.earring] : "",
+  ].filter(Boolean);
+  const outfit = (OUTFIT_TXT[c.outfit ?? "suit"] ?? OUTFIT_TXT.suit)(SUIT[c.suit] ?? "dark suit", TIE_TXT[c.tie ?? ""] ?? "dark red");
   return {
     description:
-      `bust portrait of a ${age} ${gender} CEO, ${SKIN[c.skin] ?? "light skin"}, ${hair}${extra}, ` +
-      `wearing a ${SUIT[c.suit] ?? "dark suit"} with white shirt, confident serious expression, facing viewer, ` +
-      `dark executive office background, muted realistic colors, dramatic soft lighting`,
+      `bust portrait of a ${age} ${gender} CEO, ${SKIN[c.skin] ?? "light skin"}, ${hair}, ${EYES_TXT[c.eyes ?? "almond"]}` +
+      `${extras.length ? `, ${extras.join(", ")}` : ""}, wearing ${outfit}, ${EXPRESSION[c.mouth ?? "smile"]}, facing viewer, ` +
+      `${BACKDROP_TXT[c.backdrop ?? "office"]}, muted realistic colors, dramatic soft lighting`,
     negative: "cartoon, chibi, cute, big eyes, exaggerated, text, watermark, multiple people, full body",
   };
 }

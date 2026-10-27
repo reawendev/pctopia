@@ -30,7 +30,7 @@ export type Npc = {
   look: CharacterSpec;
 };
 
-const L = (gender: "man" | "woman", skin: string, hair: CharacterSpec["hair"], hairColor: string, suit: string, accessory: CharacterSpec["accessory"] = "none", age: CharacterSpec["age"] = "young"): CharacterSpec => ({
+const L = (gender: "man" | "woman", skin: string, hair: CharacterSpec["hair"], hairColor: string, suit: string, accessory: CharacterSpec["accessory"] = "none", age: CharacterSpec["age"] = "young", x: Partial<CharacterSpec> = {}): CharacterSpec => ({
   gender,
   skin,
   hair,
@@ -38,21 +38,22 @@ const L = (gender: "man" | "woman", skin: string, hair: CharacterSpec["hair"], h
   suit,
   accessory,
   age,
+  ...x,
 });
 
 export const NPCS: Npc[] = [
-  { id: "selin", name: "Selin Aydın", age: 29, job: "Yatırım bankacısı", perk: "offer", likes: ["gastronomi", "seyahat"], dislikes: "doğa", bio: "Hafta içi borsa ekranları, hafta sonu yeni restoranlar.", look: L("woman", "#e0b48c", "long", "#4a2f1b", "#0f2a43") },
+  { id: "selin", name: "Selin Aydın", age: 29, job: "Yatırım bankacısı", perk: "offer", likes: ["gastronomi", "seyahat"], dislikes: "doğa", bio: "Hafta içi borsa ekranları, hafta sonu yeni restoranlar.", look: L("woman", "#e0b48c", "wavy", "#4a2f1b", "#0f2a43", "none", "young", { earring: "hoop", backdrop: "city" }) },
   { id: "emre", name: "Emre Yalçın", age: 32, job: "Avukat", perk: "shield", likes: ["kitap", "spor"], dislikes: "gece hayatı", bio: "Sözleşmelerin ince yazılarını okumaktan keyif alır.", look: L("man", "#c68b5f", "side", "#1a1411", "#1f2937", "glasses", "middle") },
-  { id: "defne", name: "Defne Kurt", age: 27, job: "Teknoloji gazetecisi", perk: "press", likes: ["teknoloji", "gece hayatı"], dislikes: "spor", bio: "Her lansmanda ön sıradadır, her sızıntıyı ilk o duyar.", look: L("woman", "#f1d3b8", "short", "#7c2d12", "#3b1d2a") },
-  { id: "kerem", name: "Kerem Şahin", age: 34, job: "Donanım mühendisi", perk: "parts", likes: ["teknoloji", "doğa"], dislikes: "gastronomi", bio: "Lehim kokusunu kahve kokusuna tercih eder.", look: L("man", "#e0b48c", "short", "#4a2f1b", "#14352a", "beard", "middle") },
-  { id: "ece", name: "Ece Demir", age: 30, job: "Pazarlama direktörü", perk: "demand", likes: ["sanat", "seyahat"], dislikes: "kitap", bio: "Bir ürünü üç kelimeyle satmanın yolunu bulur.", look: L("woman", "#8d5a3b", "long", "#1a1411", "#44403c") },
-  { id: "mert", name: "Mert Arslan", age: 28, job: "Girişim sermayedarı", perk: "offer", likes: ["spor", "gece hayatı"], dislikes: "sanat", bio: "Sabah koşusu, öğlen yatırım komitesi, akşam networking.", look: L("man", "#f1d3b8", "side", "#c9a15a", "#0f2a43") },
-  { id: "zeynep", name: "Zeynep Ateş", age: 31, job: "Kriz iletişimi danışmanı", perk: "shield", likes: ["kitap", "sanat"], dislikes: "gece hayatı", bio: "Kötü haberleri sakin bir sesle anlatmakta ustadır.", look: L("woman", "#c68b5f", "short", "#1a1411", "#1f2937", "glasses", "middle") },
-  { id: "can", name: "Can Öztürk", age: 26, job: "Teknoloji YouTuber'ı", perk: "press", likes: ["teknoloji", "gastronomi"], dislikes: "kitap", bio: "Yüz bin abonesine her kutu açılışını canlı yayınlar.", look: L("man", "#5b3a29", "short", "#1a1411", "#3b1d2a") },
+  { id: "defne", name: "Defne Kurt", age: 27, job: "Teknoloji gazetecisi", perk: "press", likes: ["teknoloji", "gece hayatı"], dislikes: "spor", bio: "Her lansmanda ön sıradadır, her sızıntıyı ilk o duyar.", look: L("woman", "#f1d3b8", "bob", "#7c2d12", "#3b1d2a", "none", "young", { outfit: "blazer", mouth: "smirk", backdrop: "office" }) },
+  { id: "kerem", name: "Kerem Şahin", age: 34, job: "Donanım mühendisi", perk: "parts", likes: ["teknoloji", "doğa"], dislikes: "gastronomi", bio: "Lehim kokusunu kahve kokusuna tercih eder.", look: L("man", "#e0b48c", "undercut", "#4a2f1b", "#14352a", "beard", "middle", { outfit: "blazer", backdrop: "teal" }) },
+  { id: "ece", name: "Ece Demir", age: 30, job: "Pazarlama direktörü", perk: "demand", likes: ["sanat", "seyahat"], dislikes: "kitap", bio: "Bir ürünü üç kelimeyle satmanın yolunu bulur.", look: L("woman", "#8d5a3b", "bun", "#1a1411", "#44403c", "none", "young", { earring: "stud", outfit: "turtleneck", backdrop: "brass" }) },
+  { id: "mert", name: "Mert Arslan", age: 28, job: "Girişim sermayedarı", perk: "offer", likes: ["spor", "gece hayatı"], dislikes: "sanat", bio: "Sabah koşusu, öğlen yatırım komitesi, akşam networking.", look: L("man", "#f1d3b8", "slick", "#c9a15a", "#0f2a43", "none", "young", { mouth: "grin", tie: "#1e3a8a", backdrop: "city" }) },
+  { id: "zeynep", name: "Zeynep Ateş", age: 31, job: "Kriz iletişimi danışmanı", perk: "shield", likes: ["kitap", "sanat"], dislikes: "gece hayatı", bio: "Kötü haberleri sakin bir sesle anlatmakta ustadır.", look: L("woman", "#c68b5f", "short", "#1a1411", "#1f2937", "none", "middle", { eyewear: "round", mouth: "neutral", backdrop: "office" }) },
+  { id: "can", name: "Can Öztürk", age: 26, job: "Teknoloji YouTuber'ı", perk: "press", likes: ["teknoloji", "gastronomi"], dislikes: "kitap", bio: "Yüz bin abonesine her kutu açılışını canlı yayınlar.", look: L("man", "#5b3a29", "curly", "#1a1411", "#3b1d2a", "none", "young", { outfit: "hoodie", headwear: "headphones", mouth: "grin", backdrop: "teal" }) },
   { id: "asli", name: "Aslı Polat", age: 33, job: "Tedarik zinciri müdürü", perk: "parts", likes: ["doğa", "seyahat"], dislikes: "teknoloji", bio: "Bir konteynerin limanda nerede beklediğini her zaman bilir.", look: L("woman", "#e0b48c", "side", "#8a5a2b", "#14352a", "none", "middle") },
   { id: "baran", name: "Baran Koç", age: 35, job: "Perakende zinciri sahibi", perk: "demand", likes: ["gastronomi", "spor"], dislikes: "sanat", bio: "Yirmi mağazasının raflarına ne gireceğine o karar verir.", look: L("man", "#8d5a3b", "bald", "#1a1411", "#44403c", "beard", "middle") },
-  { id: "melis", name: "Melis Erdem", age: 28, job: "Ressam", perk: "press", likes: ["sanat", "doğa"], dislikes: "teknoloji", bio: "Galeri açılışları onun ikinci evidir.", look: L("woman", "#f1d3b8", "long", "#c9a15a", "#3b1d2a") },
-  { id: "tolga", name: "Tolga Aksoy", age: 40, job: "Holding CFO'su", perk: "offer", likes: ["kitap", "seyahat"], dislikes: "spor", bio: "Rakamların arkasındaki hikâyeyi okumayı sever.", look: L("man", "#e0b48c", "side", "#9ca3af", "#1f2937", "glasses", "senior") },
+  { id: "melis", name: "Melis Erdem", age: 28, job: "Ressam", perk: "press", likes: ["sanat", "doğa"], dislikes: "teknoloji", bio: "Galeri açılışları onun ikinci evidir.", look: L("woman", "#f1d3b8", "ponytail", "#c9a15a", "#3b1d2a", "none", "young", { outfit: "shirt", backdrop: "wine" }) },
+  { id: "tolga", name: "Tolga Aksoy", age: 40, job: "Holding CFO'su", perk: "offer", likes: ["kitap", "seyahat"], dislikes: "spor", bio: "Rakamların arkasındaki hikâyeyi okumayı sever.", look: L("man", "#e0b48c", "side", "#4a2f1b", "#1f2937", "glasses", "senior", { outfit: "bowtie", tie: "#a16207", backdrop: "office" }) },
 ];
 
 export const NPC_BY_ID: Record<string, Npc> = Object.fromEntries(NPCS.map((n) => [n.id, n]));

@@ -4,21 +4,15 @@ import { useEffect, useState } from "react";
 import { UploadButton } from "@/components/Appearance";
 import { useRouter } from "next/navigation";
 import { CompanyMark, Portrait } from "@/components/Portrait";
+import { CharacterEditor } from "@/components/CharacterEditor";
 import {
-  ACCESSORIES,
-  AGES,
   DEFAULT_CHARACTER,
   DEFAULT_LOGO,
-  GENDERS,
-  HAIR_COLORS,
-  HAIR_STYLES,
   LOGO_BG,
   LOGO_COLORS,
   LOGO_SHAPES,
   LOGO_SYMBOLS,
-  SKINS,
   START_CASH,
-  SUITS,
   type CharacterSpec,
   type LogoSpec,
 } from "@/lib/game/config";
@@ -28,12 +22,8 @@ import { useRequireSession } from "@/lib/useSession";
 import { Splash } from "@/components/Splash";
 
 const TR = {
-  gender: { man: "Erkek", woman: "Kadın" },
-  age: { young: "Genç", middle: "Orta yaş", senior: "Kıdemli" },
   shape: { circle: "Daire", square: "Kare", hex: "Altıgen", shield: "Kalkan" },
   symbol: { chip: "Çip", bolt: "Şimşek", diamond: "Elmas", peak: "Zirve", ring: "Halka" },
-  hair: { short: "Kısa", side: "Yandan ayrık", long: "Uzun", bald: "Kel" },
-  accessory: { none: "Yok", glasses: "Gözlük", beard: "Sakal" },
 } as const;
 
 type Asset = { id: string; url: string };
@@ -135,13 +125,15 @@ export default function Kurulus() {
                 <label className="label" htmlFor="founder">Adın</label>
                 <input id="founder" className="input" value={founderName} onChange={(e) => setFounderName(e.target.value)} maxLength={24} placeholder="Örn. Mehmet Ali" required />
               </div>
-              <Options label="Görünüm" values={GENDERS} current={character.gender ?? "man"} text={(v) => TR.gender[v]} onPick={(gender) => setCharacter({ ...character, gender })} />
-              <Options label="Yaş" values={AGES} current={character.age ?? "middle"} text={(v) => TR.age[v]} onPick={(age) => setCharacter({ ...character, age })} />
-              <Swatches label="Ten rengi" values={SKINS} current={character.skin} onPick={(skin) => setCharacter({ ...character, skin })} />
-              <Options label="Saç" values={HAIR_STYLES} current={character.hair} text={(v) => TR.hair[v]} onPick={(hair) => setCharacter({ ...character, hair })} />
-              <Swatches label="Saç rengi" values={HAIR_COLORS} current={character.hairColor} onPick={(hairColor) => setCharacter({ ...character, hairColor })} />
-              <Swatches label="Takım elbise" values={SUITS} current={character.suit} onPick={(suit) => setCharacter({ ...character, suit })} />
-              <Options label="Ayrıntı" values={ACCESSORIES} current={character.accessory} text={(v) => TR.accessory[v]} onPick={(accessory) => setCharacter({ ...character, accessory })} />
+              <CharacterEditor
+                value={character}
+                onChange={setCharacter}
+                preview={
+                  <div className="shrink-0 overflow-hidden rounded-sm border border-amber/50">
+                    <Portrait spec={character} url={portrait?.url} size={88} />
+                  </div>
+                }
+              />
             </div>
             <GenerateRow
               enabled={canGenerate}

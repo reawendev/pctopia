@@ -45,3 +45,29 @@ assert.equal(formatCompactMoney(-1_110), "−$1,11 bin");
 assert.equal(formatCompactMoney(926), "$926");
 
 console.log("content: tüm testler geçti");
+
+// ---- Yeni görünüm seçenekleri (avatar) ----
+{
+  const C = require("../src/lib/game/config");
+  const base = C.DEFAULT_CHARACTER;
+  assert.ok(C.isValidCharacter(base), "varsayılan geçerli");
+  // Eski kayıt (yeni alanlar yok) geçerli kalır, eski "ayrıntı" yeni alanlara çevrilir
+  const old = { skin: C.SKINS[0], hair: "side", hairColor: C.HAIR_COLORS[0], suit: C.SUITS[0], accessory: "beard" };
+  assert.ok(C.isValidCharacter(old));
+  assert.equal(C.facialOf(old), "beard");
+  assert.equal(C.eyewearOf({ ...old, accessory: "glasses" }), "glasses");
+  const lists: [string, readonly string[]][] = [
+    ["hair", C.HAIR_STYLES], ["eyes", C.EYES], ["brows", C.BROWS], ["mouth", C.MOUTHS], ["facial", C.FACIAL], ["eyewear", C.EYEWEAR],
+    ["headwear", C.HEADWEAR], ["earring", C.EARRINGS], ["outfit", C.OUTFITS], ["tie", C.TIE_COLORS], ["backdrop", C.BACKDROPS], ["age", C.AGES], ["gender", C.GENDERS],
+  ];
+  for (const [k, vs] of lists) {
+    for (const v of vs) {
+      const spec = { ...base, [k]: v };
+      assert.ok(C.isValidCharacter(spec), `${k}=${v} geçerli`);
+      const { description } = portraitPrompt(spec);
+      assert.ok(!/undefined|null/.test(description), `${k}=${v}: ${description}`);
+    }
+    assert.ok(!C.isValidCharacter({ ...base, [k]: "bilinmeyen" }), `${k} listede olmayan reddedilir`);
+  }
+}
+console.log("avatar seçenekleri: tamam");
