@@ -143,3 +143,15 @@ console.log("rules: tüm testler geçti");
     assert.ok(!run, "üç boş dilim yan yana olmasın");
   }
 }
+
+// ---- Slot makinesi ----
+{
+  const { SLOT_RTP, slotPayout, slotSymbolAt, SLOT_TOTAL_WEIGHT } = require("../src/lib/game/casino");
+  assert.ok(SLOT_RTP > 0.94 && SLOT_RTP < 0.97, `slot RTP ${SLOT_RTP}`);
+  assert.equal(slotPayout(["seven", "seven", "seven"]), 250);
+  assert.equal(slotPayout(["seven", "lemon", "seven"]), 10);
+  assert.equal(slotPayout(["cherry", "bar", "cherry"]), 2);
+  assert.equal(slotPayout(["bar", "bell", "lemon"]), 0);
+  assert.equal(slotSymbolAt(0), "seven");
+  assert.equal(slotSymbolAt(SLOT_TOTAL_WEIGHT - 1), "lemon");
+}

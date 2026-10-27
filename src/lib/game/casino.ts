@@ -115,3 +115,43 @@ export function spinPayout(index: number): number {
 
 /** Beklenen geri ödeme (bahis başına). */
 export const SPIN_RTP = SPIN_SEGMENTS.reduce((s, m) => s + m, 0) / SPIN_SEGMENTS.length;
+
+// ---- Slot makinesi (3 makara; geri ödeme ≈ %95,8, kazanma sıklığı ≈ %18) ----
+export type SlotSymbol = "seven" | "diamond" | "bell" | "bar" | "cherry" | "lemon";
+/** Makaradaki ağırlıklar (her makara aynı, bağımsız): nadir olan daha çok öder. */
+export const SLOT_WEIGHTS: Record<SlotSymbol, number> = { seven: 1, diamond: 2, bell: 3, bar: 4, cherry: 5, lemon: 6 };
+export const SLOT_SYMBOLS = Object.keys(SLOT_WEIGHTS) as SlotSymbol[];
+export const SLOT_THREE: Record<SlotSymbol, number> = { seven: 250, diamond: 75, bell: 35, bar: 20, cherry: 12, lemon: 6 };
+export const SLOT_TWO_SEVENS = 10;
+export const SLOT_TWO_CHERRIES = 2;
+export const SLOT_LABEL: Record<SlotSymbol, string> = { seven: "Yedi", diamond: "Elmas", bell: "Çan", bar: "BAR", cherry: "Kiraz", lemon: "Limon" };
+
+/** Toplam geri ödeme çarpanı (bahis dahil); kaybederse 0. */
+export function slotPayout(reels: SlotSymbol[]): number {
+  const [a, b, c] = reels;
+  if (a === b && b === c) return SLOT_THREE[a];
+  const count = (s: SlotSymbol) => reels.filter((x) => x === s).length;
+  if (count("seven") === 2) return SLOT_TWO_SEVENS;
+  if (count("cherry") === 2) return SLOT_TWO_CHERRIES;
+  return 0;
+}
+
+/** 0 … toplam ağırlık−1 arası bir sayıyı sembole çevirir (sunucu crypto.randomInt ile çağırır). */
+export function slotSymbolAt(r: number): SlotSymbol {
+  let x = r;
+  for (const s of SLOT_SYMBOLS) {
+    if (x < SLOT_WEIGHTS[s]) return s;
+    x -= SLOT_WEIGHTS[s];
+  }
+  return SLOT_SYMBOLS[SLOT_SYMBOLS.length - 1];
+}
+export const SLOT_TOTAL_WEIGHT = SLOT_SYMBOLS.reduce((s, x) => s + SLOT_WEIGHTS[x], 0);
+
+/** Tam olasılıkla hesaplanan beklenen geri ödeme. */
+export const SLOT_RTP = (() => {
+  let ev = 0;
+  for (const a of SLOT_SYMBOLS) for (const b of SLOT_SYMBOLS) for (const c of SLOT_SYMBOLS) {
+    ev += ((SLOT_WEIGHTS[a] * SLOT_WEIGHTS[b] * SLOT_WEIGHTS[c]) / SLOT_TOTAL_WEIGHT ** 3) * slotPayout([a, b, c]);
+  }
+  return ev;
+})();

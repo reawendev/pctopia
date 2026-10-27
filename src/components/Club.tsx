@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { DICE_LABEL, DICE_PAYOUT, MIN_BET, RANKS, RED, ROULETTE_LABEL, SPIN_RTP, SPIN_SEGMENTS, SUITS, type Card } from "@/lib/game/casino";
+import { DICE_LABEL, DICE_PAYOUT, MIN_BET, RANKS, RED, ROULETTE_LABEL, SLOT_RTP, SLOT_THREE, SLOT_TWO_CHERRIES, SLOT_TWO_SEVENS, SPIN_RTP, SPIN_SEGMENTS, SUITS, type Card, type SlotSymbol } from "@/lib/game/casino";
 import { formatMoney } from "@/lib/game/economy";
 import { formatPrice, STOCK_BY_ID } from "@/lib/game/market";
 import { apiFetch } from "@/lib/supabase/client";
@@ -9,6 +9,7 @@ import { SkeletonCard } from "./Skeleton";
 import { RouletteWheel } from "./RouletteWheel";
 import { SpinWheel, label as spinLabel } from "./SpinWheel";
 import { Dice3D, DICE_MS } from "./Dice3D";
+import { SlotMachine, Symbol as SlotIcon } from "./SlotMachine";
 
 type Hand = { bet: number; player: Card[]; dealer: Card[]; playerTotal: number; dealerTotal: number; canDouble: boolean };
 type Quote = { id: string; price: number; odds: { minutes: number; up: number; down: number }[] };
@@ -126,9 +127,8 @@ export function Club({ cash, now, onState, notify }: { cash: number; now: number
         <div className="grid gap-3 lg:grid-cols-2">
           <Roulette cash={cash} max={d.summary.maxBet} busy={busy} play={play} />
           <Spin cash={cash} max={d.summary.maxBet} busy={busy} play={play} />
-          <div className="lg:col-span-2">
-            <Dice cash={cash} max={d.summary.maxBet} busy={busy} play={play} />
-          </div>
+          <Slot cash={cash} max={d.summary.maxBet} busy={busy} play={play} />
+          <Dice cash={cash} max={d.summary.maxBet} busy={busy} play={play} />
           <div className="lg:col-span-2">
             <Blackjack hand={d.hand} cash={cash} max={d.summary.maxBet} busy={busy} play={play} />
           </div>
@@ -214,6 +214,70 @@ function Roulette({ cash, max, busy, play }: { cash: number; max: number; busy: 
           {spin && busy ? "Dönüyor…" : "Çevir"}
         </button>
       </div>
+    </section>
+  );
+}
+
+// ---------------- Slot makinesi ----------------
+
+function Slot({ cash, max, busy, play }: { cash: number; max: number; busy: boolean; play: Play }) {
+  const [bet, setBet] = useState("1000");
+  const [spin, setSpin] = useState<{ id: number; reels: SlotSymbol[] } | null>(null);
+  const [win, setWin] = useState<number | null>(null);
+  const landed = useRef<(() => void) | null>(null);
+  useEffect(() => () => landed.current?.(), []);
+  const b = Number(bet) || 0;
+  const can = !busy && okBet(b, cash, max);
+
+  async function go() {
+    if (!can) return;
+    setWin(null);
+    await play({ game: "slot", bet: b }, (r) =>
+      new Promise<void>((resolve) => {
+        const reels = r.result?.reels;
+        if (!Array.isArray(reels)) return resolve();
+        landed.current = () => {
+          setWin(r.result.mult);
+          resolve();
+        };
+        setSpin({ id: Date.now(), reels });
+      })
+    );
+  }
+
+  const table: [SlotSymbol[], number][] = [
+    ...(Object.keys(SLOT_THREE) as SlotSymbol[]).map((k) => [[k, k, k], SLOT_THREE[k]] as [SlotSymbol[], number]),
+    [["seven", "seven"], SLOT_TWO_SEVENS],
+    [["cherry", "cherry"], SLOT_TWO_CHERRIES],
+  ];
+
+  return (
+    <section className="card p-4">
+      <div className="flex items-baseline justify-between">
+        <h3 className="heading text-lg">Slot makinesi</h3>
+        {win !== null && <span className={`num result-pop text-sm font-semibold ${win > 0 ? "text-gain" : "text-mute"}`}>{win > 0 ? `×${win}` : "Tutmadı"}</span>}
+      </div>
+      <p className="text-xs text-mute">Kolu çek ya da Çevir'e bas. Orta çizgide üç aynı sembol ya da iki 7 / iki kiraz kazandırır. Uzun vadede bahsin %{Math.round(SLOT_RTP * 1000) / 10}'i geri döner.</p>
+      <div className="my-3">
+        <SlotMachine spin={spin} win={win} disabled={!can} onPull={go} onDone={() => { landed.current?.(); landed.current = null; }} />
+      </div>
+      <div className="flex flex-wrap items-end gap-2">
+        <BetInput id="sl-bet" value={bet} onChange={setBet} max={max} />
+        <button className="btn btn-primary" disabled={!can} onClick={go}>
+          {spin && busy ? "Dönüyor…" : "Çevir"}
+        </button>
+      </div>
+      <details className="mt-3 text-sm">
+        <summary className="cursor-pointer text-xs text-mute hover:text-white">Ödeme tablosu</summary>
+        <ul className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1">
+          {table.map(([syms, m]) => (
+            <li key={syms.join("")} className="flex items-center justify-between gap-2">
+              <span className="flex">{syms.map((x, i) => <SlotIcon key={i} s={x} size={20} />)}</span>
+              <span className="num text-xs">×{m}</span>
+            </li>
+          ))}
+        </ul>
+      </details>
     </section>
   );
 }

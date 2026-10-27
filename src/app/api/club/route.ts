@@ -1,7 +1,7 @@
 import { isRouletteBet, type DiceBet } from "@/lib/game/casino";
 import { formatMoney } from "@/lib/game/economy";
 import {
-  blackjack, clubSummary, loadHand, marketQuotes, placeMarketBet, placePoolBet, playDice, playSpin, playRoulette, poolsView, settleMarketBets, syncPools, type Player,
+  blackjack, clubSummary, loadHand, marketQuotes, placeMarketBet, placePoolBet, playDice, playSlot, playSpin, playRoulette, poolsView, settleMarketBets, syncPools, type Player,
 } from "@/lib/server/casino";
 import { loadCompany, loadJournal, view } from "@/lib/server/company";
 import { invalidateEquity } from "@/lib/server/equity";
@@ -64,6 +64,12 @@ export const POST = handle(async (req) => {
       const r = await playRoulette(p, Number(body.bet), body.choice);
       result = r;
       message = r.net > 0 ? `Top ${r.n} numarada durdu. ${formatMoney(r.net)} kazandın.` : `Top ${r.n} numarada durdu. Kaybettin.`;
+      break;
+    }
+    case "slot": {
+      const r = await playSlot(p, Number(body.bet));
+      result = r;
+      message = r.mult > 0 ? `${r.mult === 250 ? "JACKPOT! " : ""}×${r.mult.toLocaleString("tr-TR")}: ${formatMoney(r.net)} kazandın.` : "Makaralar tutmadı. Kaybettin.";
       break;
     }
     case "spin": {
